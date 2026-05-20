@@ -1,51 +1,172 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ──────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --brand-500: #6366f1;
-  --brand-600: #4f46e5;
-  --sidebar-bg: #1e1b4b;
-  --sidebar-text: #c7d2fe;
-  --sidebar-active-bg: #312e81;
-  --sidebar-active-text: #ffffff;
-  --sidebar-hover-bg: #312e81;
+  /* Base backgrounds */
+  --background: #f7f4ef;
+  --foreground: #1a1710;
+
+  /* Surface layers */
   --surface: #ffffff;
-  --surface-muted: #f9fafb;
-  --surface-border: #e5e7eb;
+  --surface-muted: #f0ece5;
+  --surface-border: #e0d5c3;
+  --surface-border-strong: #c4b79a;
+
+  /* Brand – deep forest green */
+  --brand-500: #2e7d46;
+  --brand-600: #1e5c32;
+  --brand-700: #0f3a1e;
+  --brand-muted: #eaf4ed;
+  --brand-text: #ffffff;
+
+  /* Accent – terracotta / rust */
+  --accent-500: #c8561e;
+  --accent-600: #a84015;
+  --accent-muted: #fdf0e8;
+
+  /* Text shades */
+  --text-muted: #786a58;
+  --text-subtle: #a0927e;
+
+  /* Sidebar */
+  --sidebar-bg: #0d2819;
+  --sidebar-text: #b0cfba;
+  --sidebar-active-bg: #1e5c32;
+  --sidebar-active-text: #ffffff;
+  --sidebar-hover-bg: #163821;
+
+  /* Status */
+  --success: #2e7d46;
+  --success-bg: #eaf4ed;
+  --warning: #a85508;
+  --warning-bg: #fef7ee;
+  --danger: #c42d2d;
+  --danger-bg: #fef2f2;
+  --info: #1d5f8a;
+  --info-bg: #eff6ff;
 }
 
 .dark {
-  --background: #0f0f1a;
-  --foreground: #f0f0ff;
-  --surface: #1a1a2e;
-  --surface-muted: #16213e;
-  --surface-border: #2d2d4e;
-  --sidebar-bg: #0f0f1a;
-  --sidebar-text: #a5b4fc;
-  --sidebar-active-bg: #1e1b4b;
-  --sidebar-active-text: #ffffff;
-  --sidebar-hover-bg: #1e1b4b;
+  --background: #0f0d0b;
+  --foreground: #f0e8dc;
+
+  --surface: #1a1714;
+  --surface-muted: #141210;
+  --surface-border: #302820;
+  --surface-border-strong: #4a3830;
+
+  --brand-500: #5db870;
+  --brand-600: #4da85e;
+  --brand-700: #3a9048;
+  --brand-muted: #0e2c16;
+  --brand-text: #001a08;
+
+  --accent-500: #f5853d;
+  --accent-600: #d4672a;
+  --accent-muted: #2d1a0a;
+
+  --text-muted: #9e8e7e;
+  --text-subtle: #6e5e4e;
+
+  --sidebar-bg: #060a07;
+  --sidebar-text: #8eba96;
+  --sidebar-active-bg: #1a3a22;
+  --sidebar-active-text: #c8e0ce;
+  --sidebar-hover-bg: #102018;
+
+  --success: #5db870;
+  --success-bg: #0e2c16;
+  --warning: #f5853d;
+  --warning-bg: #2d1a0a;
+  --danger: #ff6b6b;
+  --danger-bg: #2d1010;
+  --info: #60a5fa;
+  --info-bg: #172554;
 }
 
+/* ─── Tailwind 4 theme mapping ───────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-border: var(--surface-border);
+
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-muted: var(--brand-muted);
+
+  --color-accent-500: var(--accent-500);
+  --color-accent-muted: var(--accent-muted);
+
+  --font-sans: var(--font-syne), 'Segoe UI', system-ui, sans-serif;
+  --font-body: var(--font-dmsans), 'Segoe UI', system-ui, sans-serif;
 }
 
+/* ─── Base styles ────────────────────────────────────────────────────────── */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
+  font-family: var(--font-dmsans, system-ui, sans-serif);
+  -webkit-tap-highlight-color: transparent;
 }
 
-html { scroll-behavior: smooth; }
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-syne, system-ui, sans-serif);
+}
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+html {
+  scroll-behavior: smooth;
+  height: 100%;
+  /* Prevent content from going under notches/home indicator */
+  padding-top: env(safe-area-inset-top);
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+::-webkit-scrollbar-thumb { background: var(--brand-600); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-700); }
 
-:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+/* ─── Focus ring ─────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand-600);
+  outline-offset: 2px;
+}
+
+/* ─── Mobile safe area bottom padding for nav ────────────────────────────── */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ─── Page transition animation ─────────────────────────────────────────── */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: fadeSlideIn 0.25s ease-out both;
+}
+
+/* ─── Bottom nav indicator dot ───────────────────────────────────────────── */
+@keyframes navPop {
+  0%   { transform: scale(0); }
+  60%  { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.nav-active-dot {
+  animation: navPop 0.2s ease-out both;
+}
+
+/* ─── Card hover lift ─────────────────────────────────────────────────────── */
+.card-hover {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.12);
+}
