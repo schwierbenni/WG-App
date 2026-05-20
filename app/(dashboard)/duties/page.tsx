@@ -85,6 +85,7 @@ export default function DutiesPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
   const [filter, setFilter] = React.useState<FilterTab>('all')
+  const [completing, setCompleting] = React.useState<string | null>(null)
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -111,6 +112,34 @@ export default function DutiesPage() {
     fetchData()
   }, [fetchData])
 
+  async function handleComplete(assignmentId: string) {
+    setCompleting(assignmentId)
+    try {
+      const res = await fetch(`/api/assignments/${assignmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'complete' }),
+      })
+      if (res.ok) await fetchData()
+    } finally {
+      setCompleting(null)
+    }
+  }
+
+  async function handleUncomplete(assignmentId: string) {
+    setCompleting(assignmentId)
+    try {
+      const res = await fetch(`/api/assignments/${assignmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'uncomplete' }),
+      })
+      if (res.ok) await fetchData()
+    } finally {
+      setCompleting(null)
+    }
+  }
+
   const filtered = React.useMemo(() => {
     if (filter === 'all') return duties
     return duties.filter((duty) => {
@@ -127,6 +156,8 @@ export default function DutiesPage() {
     const überfällig = duties.filter((d) => getDutyStatus(d.assignments[0]) === 'überfällig').length
     return { all, offen, erledigt, überfällig }
   }, [duties])
+
+  const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN'
 
   return (
     <div className="space-y-6">
@@ -194,6 +225,8 @@ export default function DutiesPage() {
             const assignment = duty.assignments[0]
             const status = getDutyStatus(assignment)
             const isMyAssignment = assignment?.user?.id === session?.user?.id
+            const canComplete = assignment && !assignment.completedAt && (isMyAssignment || isAdmin)
+            const canUncomplete = assignment?.completedAt && isAdmin
 
             return (
               <Card
@@ -272,6 +305,31 @@ export default function DutiesPage() {
                           members={members}
                           onSuccess={fetchData}
                         />
+                      )}
+
+                      {canComplete && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleComplete(assignment.id)}
+                          disabled={completing === assignment.id}
+                          className="w-full gap-1.5 text-green-700 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          {completing === assignment.id ? 'Markiere…' : 'Als erledigt markieren'}
+                        </Button>
+                      )}
+
+                      {canUncomplete && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleUncomplete(assignment.id)}
+                          disabled={completing === assignment.id}
+                          className="w-full gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          {completing === assignment.id ? 'Setze zurück…' : 'Erledigt rückgängig'}
+                        </Button>
                       )}
                     </div>
                   ) : (

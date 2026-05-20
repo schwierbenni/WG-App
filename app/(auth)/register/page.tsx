@@ -186,7 +186,11 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense>
+    <Suspense fallback={
+      <Card className="shadow-lg border-0 bg-white dark:bg-gray-900">
+        <CardContent className="pt-10 pb-10 text-center text-gray-400">Laden…</CardContent>
+      </Card>
+    }>
       <RegisterForm />
     </Suspense>
   )

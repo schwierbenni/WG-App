@@ -25,6 +25,7 @@ function createClient(): PrismaClient {
       'Bitte setze die Variable in Vercel (Project Settings → Environment Variables).'
     )
   }
+}
 
   const connectionString = sanitize(raw)
 
