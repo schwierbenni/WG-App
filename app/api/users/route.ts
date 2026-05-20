@@ -1,5 +1,6 @@
 import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
+import { logger } from '@/lib/logger'
 
 export async function GET() {
   const session = await auth()
@@ -12,7 +13,7 @@ export async function GET() {
     })
     return Response.json({ users })
   } catch (error) {
-    console.error('GET users error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
+    logger.error('GET /api/users fehlgeschlagen', { error: error instanceof Error ? error.message : String(error) })
+    return Response.json({ error: 'Benutzerliste konnte nicht geladen werden.' }, { status: 500 })
   }
 }
