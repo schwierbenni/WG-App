@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -18,7 +18,7 @@ const schema = z.object({
 }).refine(d => d.password === d.confirmPassword, { message: 'Passwörter stimmen nicht überein', path: ['confirmPassword'] })
 type Values = z.infer<typeof schema>
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter()
   const token = useSearchParams().get('token')
   const [showPw, setShowPw] = useState(false)
@@ -79,5 +79,13 @@ export default function ResetPasswordPage() {
         </CardFooter>
       </form>
     </Card>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense>
+      <ResetPasswordForm />
+    </Suspense>
   )
 }
