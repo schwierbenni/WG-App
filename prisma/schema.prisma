@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  name               String
+  email              String    @unique
+  passwordHash       String
+  avatarUrl          String?
+  role               Role      @default(MEMBER)
+  emailNotifications Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  assignments      DutyAssignment[]
+  swapRequestsFrom SwapRequest[]         @relation("SwapFrom")
+  swapRequestsTo   SwapRequest[]         @relation("SwapTo")
+  announcements    Announcement[]
+  reactions        AnnouncementReaction[]
+  shoppingItems    ShoppingItem[]
+  expenses         Expense[]
+  notifications    Notification[]
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model WGConfig {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique @default(cuid())
+  createdAt  DateTime @default(now())
+}
+
+model Duty {
+  id               String           @id @default(cuid())
+  name             String
+  description      String?
+  emoji            String?
+  color            String           @default("#6366f1")
+  rotationInterval RotationInterval @default(WEEKLY)
+  isActive         Boolean          @default(true)
+  isPaused         Boolean          @default(false)
+  rotationOrder    String[]
+  checklistItems   String[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  assignments DutyAssignment[]
+}
+
+enum RotationInterval {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  MANUAL
+}
+
+model DutyAssignment {
+  id          String    @id @default(cuid())
+  dutyId      String
+  userId      String
+  dueDate     DateTime
+  completedAt DateTime?
+  completedBy String?
+  createdAt   DateTime  @default(now())
+
+  duty         Duty          @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  swapRequests SwapRequest[]
+}
+
+model SwapRequest {
+  id           String     @id @default(cuid())
+  fromUserId   String
+  toUserId     String
+  assignmentId String
+  status       SwapStatus @default(PENDING)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  fromUser   User           @relation("SwapFrom", fields: [fromUserId], references: [id])
+  toUser     User           @relation("SwapTo", fields: [toUserId], references: [id])
+  assignment DutyAssignment @relation(fields: [assignmentId], references: [id])
+}
+
+enum SwapStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model Announcement {
+  id        String   @id @default(cuid())
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  author    User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reactions AnnouncementReaction[]
+}
+
+model AnnouncementReaction {
+  id             String @id @default(cuid())
+  announcementId String
+  userId         String
+  emoji          String
+
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, userId, emoji])
+}
+
+model ShoppingItem {
+  id        String           @id @default(cuid())
+  name      String
+  category  ShoppingCategory @default(LEBENSMITTEL)
+  note      String?
+  addedBy   String
+  boughtAt  DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [addedBy], references: [id])
+}
+
+enum ShoppingCategory {
+  LEBENSMITTEL
+  HAUSHALT
+  SONSTIGES
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  amount      Float
+  description String
+  category    ExpenseCategory @default(SONSTIGES)
+  paidBy      String
+  splitWith   String[]
+  date        DateTime        @default(now())
+  settledAt   DateTime?
+  createdAt   DateTime        @default(now())
+
+  paidByUser User @relation(fields: [paidBy], references: [id])
+}
+
+enum ExpenseCategory {
+  LEBENSMITTEL
+  HAUSHALT
+  MIETE_NEBENKOSTEN
+  SONSTIGES
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  message   String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum NotificationType {
+  ASSIGNMENT
+  SWAP_REQUEST
+  REMINDER
+  ANNOUNCEMENT
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model InviteToken {
+  id        String    @id @default(cuid())
+  token     String    @unique @default(cuid())
+  createdBy String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
