@@ -6,8 +6,6 @@ const g = globalThis as unknown as { _prisma?: PrismaClient }
 function sanitize(url: string): string {
   try {
     const u = new URL(url)
-    // Remove params that conflict with the pg pool ssl config or are
-    // Prisma URL-mode hints not understood by the pg driver adapter.
     u.searchParams.delete('sslmode')
     u.searchParams.delete('pgbouncer')
     u.searchParams.delete('connection_limit')
@@ -25,12 +23,8 @@ function createClient(): PrismaClient {
       'Bitte setze die Variable in Vercel (Project Settings → Environment Variables).'
     )
   }
-}
 
   const connectionString = sanitize(raw)
-
-  // Always use SSL in production; rejectUnauthorized:false accepts
-  // Supabase’s certificate chain without needing the CA in the trust store.
   const ssl = process.env.NODE_ENV === 'production'
     ? { rejectUnauthorized: false }
     : undefined

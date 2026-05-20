@@ -187,9 +187,9 @@ function RegisterForm() {
 export default function RegisterPage() {
   return (
     <Suspense fallback={
-      <Card className="shadow-lg border-0 bg-white dark:bg-gray-900">
-        <CardContent className="pt-10 pb-10 text-center text-gray-400">Laden…</CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-16 text-[var(--text-muted)]">
+        Laden…
+      </div>
     }>
       <RegisterForm />
     </Suspense>
