@@ -1,0 +1,29 @@
+import { auth } from '@/lib/auth'
+import { NextResponse } from 'next/server'
+
+export default auth((req) => {
+  const isLoggedIn = !!req.auth
+  const isAuthPage = req.nextUrl.pathname.startsWith('/login') ||
+    req.nextUrl.pathname.startsWith('/register') ||
+    req.nextUrl.pathname.startsWith('/forgot-password') ||
+    req.nextUrl.pathname.startsWith('/reset-password')
+  const isApiAuth = req.nextUrl.pathname.startsWith('/api/auth')
+  const isApiPublic = req.nextUrl.pathname === '/api/register' ||
+    req.nextUrl.pathname === '/api/invite'
+
+  if (isApiAuth || isApiPublic) return NextResponse.next()
+
+  if (!isLoggedIn && !isAuthPage) {
+    return NextResponse.redirect(new URL('/login', req.nextUrl))
+  }
+
+  if (isLoggedIn && isAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', req.nextUrl))
+  }
+
+  return NextResponse.next()
+})
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\.png$|.*\.svg$).*)'],
+}
