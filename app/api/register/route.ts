@@ -62,16 +62,11 @@ export async function POST(request: Request) {
     const userCount = await prisma.user.count()
     const isFirstUser = userCount === 0
 
-    if (!isFirstUser) {
-      if (!inviteToken) {
-        logger.warn('Registrierung ohne Einladungstoken', { email })
-        return Response.json({ error: 'Ein Einladungstoken ist erforderlich.' }, { status: 403 })
-      }
-
+    // Wenn ein Invite-Token mitgeschickt wurde, trotzdem validieren (optional)
+    if (inviteToken) {
       const token = await prisma.inviteToken.findUnique({ where: { token: inviteToken } })
       if (!token) {
-        logger.warn('Ungültiger Einladungstoken', { email })
-        return Response.json({ error: 'Der Einladungslink ist ungültig.' }, { status: 403 })
+        return Response.json({ error: 'Dieser Einladungslink ist ungültig.' }, { status: 400 })
       }
       if (token.usedAt) {
         logger.warn('Einladungstoken bereits verwendet', { email })

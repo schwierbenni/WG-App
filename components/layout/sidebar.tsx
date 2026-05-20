@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, ClipboardList, Calendar, BarChart2, Megaphone,
-  ShoppingCart, CreditCard, User, Settings, X, Menu, ChevronRight,
+  ShoppingCart, CreditCard, User, Settings, Users,
+  ChevronRight, Grid3X3, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -17,19 +18,19 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/duties', label: 'Dienste', icon: ClipboardList },
-  { href: '/calendar', label: 'Kalender', icon: Calendar },
-  { href: '/statistics', label: 'Statistiken', icon: BarChart2 },
+  { href: '/dashboard',     label: 'Dashboard',      icon: Home },
+  { href: '/duties',        label: 'Dienste',         icon: ClipboardList },
+  { href: '/calendar',      label: 'Kalender',        icon: Calendar },
+  { href: '/statistics',    label: 'Statistiken',     icon: BarChart2 },
   { href: '/announcements', label: 'Schwarzes Brett', icon: Megaphone },
-  { href: '/shopping', label: 'Einkaufsliste', icon: ShoppingCart },
-  { href: '/expenses', label: 'Ausgaben', icon: CreditCard },
-  { href: '/profile', label: 'Profil', icon: User },
+  { href: '/shopping',      label: 'Einkaufsliste',   icon: ShoppingCart },
+  { href: '/expenses',      label: 'Ausgaben',        icon: CreditCard },
+  { href: '/profile',       label: 'Profil',          icon: User },
 ]
 
 const adminNavItems: NavItem[] = [
-  { href: '/admin/duties', label: 'Dienste verwalten', icon: Settings, adminOnly: true },
-  { href: '/admin/members', label: 'Mitglieder', icon: User, adminOnly: true },
+  { href: '/admin/duties',   label: 'Dienste verwalten', icon: Settings, adminOnly: true },
+  { href: '/admin/members',  label: 'Mitglieder',        icon: Users,    adminOnly: true },
 ]
 
 interface SidebarProps {
@@ -39,122 +40,257 @@ interface SidebarProps {
   userAvatar?: string | null
 }
 
-function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
+/* ─── Desktop sidebar nav link ──────────────────────────────────────────── */
+function SidebarNavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
   const pathname = usePathname()
-  const isActive = item.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(item.href)
+  const isActive = item.href === '/dashboard'
+    ? pathname === '/dashboard'
+    : pathname.startsWith(item.href)
 
   return (
     <Link
       href={item.href}
       onClick={onClick}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150',
+        'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 group',
         isActive
           ? 'bg-[var(--sidebar-active-bg)] text-[var(--sidebar-active-text)] shadow-sm'
           : 'text-[var(--sidebar-text)] hover:bg-[var(--sidebar-hover-bg)] hover:text-white'
       )}
     >
-      <item.icon className="h-4 w-4 shrink-0" />
-      <span>{item.label}</span>
-      {isActive && <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-60" />}
+      <item.icon className={cn('h-4 w-4 shrink-0 transition-transform group-hover:scale-110', isActive && 'scale-110')} />
+      <span className="flex-1">{item.label}</span>
+      {isActive && <ChevronRight className="h-3 w-3 opacity-50" />}
     </Link>
   )
 }
 
+/* ─── Desktop sidebar content ───────────────────────────────────────────── */
 function SidebarContent({ userRole, onLinkClick }: { userRole?: string; onLinkClick?: () => void }) {
   const isAdmin = userRole === 'ADMIN'
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="flex items-center gap-2.5 px-4 py-5 border-b border-indigo-900/40">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500 shadow-sm">
+      {/* Brand */}
+      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-600)] shadow-md">
           <Home className="h-4 w-4 text-white" />
         </div>
         <div>
-          <span className="text-base font-bold text-white leading-none">FlatMate</span>
-          <p className="text-[10px] text-indigo-300 leading-tight mt-0.5">WG-Verwaltung</p>
+          <span
+            className="text-base font-extrabold text-white leading-none"
+            style={{ fontFamily: 'var(--font-syne, system-ui)' }}
+          >
+            FlatMate
+          </span>
+          <p className="text-[10px] text-[var(--sidebar-text)] leading-tight mt-0.5 tracking-widest uppercase">
+            WG-App
+          </p>
         </div>
       </div>
 
+      {/* Main nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
-        <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70">Navigation</p>
+        <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-50">
+          Navigation
+        </p>
         {mainNavItems.map((item) => (
-          <NavLink key={item.href} item={item} onClick={onLinkClick} />
+          <SidebarNavLink key={item.href} item={item} onClick={onLinkClick} />
         ))}
 
         {isAdmin && (
-          <div className="pt-4 pb-2">
-            <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-indigo-400/70">Administration</p>
+          <div className="pt-4">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-50">
+              Administration
+            </p>
             {adminNavItems.map((item) => (
-              <NavLink key={item.href} item={item} onClick={onLinkClick} />
+              <SidebarNavLink key={item.href} item={item} onClick={onLinkClick} />
             ))}
           </div>
         )}
       </nav>
 
-      <div className="px-4 py-3 border-t border-indigo-900/40">
-        <p className="text-[11px] text-indigo-400/60 text-center">WG-Verwaltung leicht gemacht</p>
+      {/* Footer */}
+      <div className="px-4 py-4 border-t border-white/10">
+        <p className="text-[10px] text-[var(--sidebar-text)] opacity-40 text-center tracking-wide">
+          Zuhause organisiert bleiben
+        </p>
       </div>
     </div>
   )
 }
 
+/* ─── Desktop sidebar ───────────────────────────────────────────────────── */
 export function Sidebar({ userRole }: SidebarProps) {
-  const [mobileOpen, setMobileOpen] = useState(false)
+  return (
+    <aside
+      className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 h-full"
+      style={{ background: 'var(--sidebar-bg)' }}
+    >
+      <SidebarContent userRole={userRole} />
+    </aside>
+  )
+}
+
+/* ─── Mobile bottom navigation ──────────────────────────────────────────── */
+const bottomPrimary: NavItem[] = [
+  { href: '/dashboard',     label: 'Home',    icon: Home },
+  { href: '/duties',        label: 'Dienste', icon: ClipboardList },
+  { href: '/announcements', label: 'Brett',   icon: Megaphone },
+  { href: '/shopping',      label: 'Einkauf', icon: ShoppingCart },
+]
+
+function BottomNavLink({
+  item,
+  active,
+  onClick,
+}: {
+  item: NavItem
+  active: boolean
+  onClick?: () => void
+}) {
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={cn(
+        'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-colors relative',
+        active ? 'text-brand-600' : 'text-[var(--text-muted)]'
+      )}
+    >
+      {active && (
+        <span className="absolute top-1 w-1 h-1 rounded-full bg-brand-600 nav-active-dot" />
+      )}
+      <item.icon className={cn('h-5 w-5 transition-transform', active && 'scale-110')} />
+      <span className={cn('text-[10px]', active ? 'font-bold' : 'font-medium')}>
+        {item.label}
+      </span>
+    </Link>
+  )
+}
+
+export function BottomNav({ userRole }: { userRole?: string }) {
+  const pathname = usePathname()
+  const [moreOpen, setMoreOpen] = useState(false)
+
+  const isAdmin = userRole === 'ADMIN'
+
+  const moreItems = [
+    { href: '/calendar',   label: 'Kalender',    icon: Calendar },
+    { href: '/statistics', label: 'Statistiken', icon: BarChart2 },
+    { href: '/expenses',   label: 'Ausgaben',    icon: CreditCard },
+    { href: '/profile',    label: 'Profil',      icon: User },
+    ...(isAdmin
+      ? [
+          { href: '/admin/duties',  label: 'Verwaltung',  icon: Settings },
+          { href: '/admin/members', label: 'Mitglieder',  icon: Users },
+        ]
+      : []),
+  ]
+
+  const moreActive = moreItems.some(i =>
+    i.href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(i.href)
+  )
 
   return (
     <>
-      <aside className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 bg-[var(--sidebar-bg)] h-full">
-        <SidebarContent userRole={userRole} />
-      </aside>
-
-      {mobileOpen && (
+      {/* More sheet backdrop */}
+      {moreOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+          onClick={() => setMoreOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      <aside
-        className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-[var(--sidebar-bg)] transition-transform duration-300 ease-in-out lg:hidden',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
+      {/* More bottom sheet */}
+      {moreOpen && (
+        <div
+          className="fixed left-0 right-0 z-50 lg:hidden bg-surface rounded-t-3xl shadow-2xl border-t border-surface-border"
+          style={{ bottom: `calc(64px + env(safe-area-inset-bottom, 0px))` }}
+        >
+          <div className="px-4 pt-3 pb-4">
+            <div className="flex items-center justify-between mb-4">
+              <p
+                className="text-sm font-bold text-foreground"
+                style={{ fontFamily: 'var(--font-syne, system-ui)' }}
+              >
+                Mehr
+              </p>
+              <button
+                onClick={() => setMoreOpen(false)}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-surface-muted transition-colors"
+                aria-label="Schließen"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-3">
+              {moreItems.map((item) => {
+                const active = item.href === '/dashboard'
+                  ? pathname === '/dashboard'
+                  : pathname.startsWith(item.href)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMoreOpen(false)}
+                    className={cn(
+                      'flex flex-col items-center gap-2 p-3 rounded-2xl transition-colors',
+                      active
+                        ? 'bg-brand-muted text-brand-600'
+                        : 'bg-surface-muted text-foreground hover:bg-brand-muted hover:text-brand-600'
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span className="text-[10px] font-semibold text-center leading-tight">
+                      {item.label}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom nav bar */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-surface border-t-2 border-surface-border"
+        style={{
+          height: `calc(64px + env(safe-area-inset-bottom, 0px))`,
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-900/40">
-          <span className="text-base font-bold text-white">FlatMate</span>
+        <div className="flex items-stretch h-16">
+          {bottomPrimary.map((item) => {
+            const active = item.href === '/dashboard'
+              ? pathname === '/dashboard'
+              : pathname.startsWith(item.href)
+            return (
+              <BottomNavLink key={item.href} item={item} active={active} />
+            )
+          })}
+
+          {/* More button */}
           <button
-            onClick={() => setMobileOpen(false)}
-            className="rounded-md p-1.5 text-indigo-300 hover:bg-indigo-900/50 hover:text-white transition-colors"
-            aria-label="Menü schließen"
+            onClick={() => setMoreOpen((v) => !v)}
+            className={cn(
+              'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-colors relative',
+              moreOpen || moreActive ? 'text-brand-600' : 'text-[var(--text-muted)]'
+            )}
+            aria-label="Mehr anzeigen"
           >
-            <X className="h-5 w-5" />
+            {(moreOpen || moreActive) && (
+              <span className="absolute top-1 w-1 h-1 rounded-full bg-brand-600 nav-active-dot" />
+            )}
+            <Grid3X3 className={cn('h-5 w-5 transition-transform', moreOpen && 'scale-110 rotate-12')} />
+            <span className={cn('text-[10px]', (moreOpen || moreActive) ? 'font-bold' : 'font-medium')}>
+              Mehr
+            </span>
           </button>
         </div>
-        <SidebarContent userRole={userRole} onLinkClick={() => setMobileOpen(false)} />
-      </aside>
-
-      <button
-        id="sidebar-mobile-toggle"
-        onClick={() => setMobileOpen((v) => !v)}
-        className="hidden"
-        aria-label="Menü öffnen"
-      >
-        <Menu className="h-5 w-5" />
-      </button>
+      </nav>
     </>
-  )
-}
-
-export function MobileSidebarToggle() {
-  return (
-    <button
-      onClick={() => { document.getElementById('sidebar-mobile-toggle')?.click() }}
-      className="inline-flex items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors lg:hidden"
-      aria-label="Menü öffnen"
-    >
-      <Menu className="h-5 w-5" />
-    </button>
   )
 }

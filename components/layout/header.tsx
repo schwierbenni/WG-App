@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { Bell, Moon, Sun, LogOut, User, Menu } from 'lucide-react'
+import { Bell, Moon, Sun, LogOut, User } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -46,15 +46,27 @@ function ThemeToggle() {
   }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
+    <button
       onClick={toggle}
-      aria-label={theme === 'dark' ? 'Helles Design aktivieren' : 'Dunkles Design aktivieren'}
-      className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+      aria-label={theme === 'dark' ? 'Helles Design' : 'Dunkles Design'}
+      className={cn(
+        'relative h-8 w-14 rounded-full border-2 transition-colors duration-300',
+        theme === 'dark'
+          ? 'bg-[var(--brand-muted)] border-brand-600'
+          : 'bg-surface-muted border-surface-border'
+      )}
     >
-      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </Button>
+      <span
+        className={cn(
+          'absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full shadow-sm transition-all duration-300',
+          theme === 'dark'
+            ? 'left-[calc(100%-1.625rem)] bg-brand-600 text-white'
+            : 'left-0.5 bg-white text-[var(--text-muted)]'
+        )}
+      >
+        {theme === 'dark' ? <Moon className="h-3 w-3" /> : <Sun className="h-3 w-3" />}
+      </span>
+    </button>
   )
 }
 
@@ -90,47 +102,57 @@ function NotificationBell() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+        <button
+          className="relative flex h-9 w-9 items-center justify-center rounded-xl text-[var(--text-muted)] hover:bg-surface-muted hover:text-foreground transition-colors"
           aria-label={`Benachrichtigungen${unreadCount > 0 ? ` (${unreadCount} ungelesen)` : ''}`}
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent-500)] text-[10px] font-bold text-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
-        </Button>
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
-        <div className="flex items-center justify-between px-2 py-1.5">
-          <DropdownMenuLabel className="p-0 text-sm font-semibold">Benachrichtigungen</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-80 rounded-2xl border-2 border-surface-border">
+        <div className="flex items-center justify-between px-3 py-2.5">
+          <DropdownMenuLabel
+            className="p-0 font-bold text-foreground"
+            style={{ fontFamily: 'var(--font-syne, system-ui)' }}
+          >
+            Benachrichtigungen
+          </DropdownMenuLabel>
           {unreadCount > 0 && (
             <button
               onClick={markAllRead}
-              className="text-xs text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 transition-colors"
+              className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors"
             >
-              Alle als gelesen markieren
+              Alle gelesen
             </button>
           )}
         </div>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className="bg-surface-border" />
         {notifications.length === 0 ? (
-          <div className="px-2 py-6 text-center text-sm text-gray-500">Keine neuen Benachrichtigungen</div>
+          <div className="px-3 py-8 text-center">
+            <Bell className="h-8 w-8 text-[var(--text-subtle)] mx-auto mb-2 opacity-40" />
+            <p className="text-sm text-[var(--text-muted)]">Alles ruhig hier</p>
+          </div>
         ) : (
           <div className="max-h-72 overflow-y-auto">
             {notifications.map((n) => (
               <div
                 key={n.id}
                 className={cn(
-                  'flex gap-2 px-2 py-2 text-sm border-b border-gray-100 dark:border-gray-700 last:border-0',
-                  !n.readAt && 'bg-indigo-50/60 dark:bg-indigo-900/20'
+                  'flex gap-3 px-3 py-2.5 text-sm border-b border-surface-border last:border-0',
+                  !n.readAt && 'bg-brand-muted'
                 )}
               >
-                {!n.readAt && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-indigo-500" />}
-                <p className={cn('text-gray-700 dark:text-gray-300', !n.readAt && 'font-medium')}>{n.message}</p>
+                {!n.readAt && (
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" />
+                )}
+                <p className={cn('text-[var(--text-muted)]', !n.readAt && 'font-medium text-foreground')}>
+                  {n.message}
+                </p>
               </div>
             ))}
           </div>
@@ -148,62 +170,70 @@ export function Header({ userName, userEmail, userAvatar }: HeaderProps) {
     router.push('/login')
   }
 
-  function openMobileSidebar() {
-    document.getElementById('sidebar-mobile-toggle')?.click()
-  }
-
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={openMobileSidebar}
-          className="inline-flex items-center justify-center rounded-md p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors lg:hidden"
-          aria-label="Menü öffnen"
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b-2 border-surface-border bg-surface px-4 shadow-sm">
+      {/* Brand – mobile only */}
+      <Link
+        href="/dashboard"
+        className="lg:hidden"
+        aria-label="FlatMate Dashboard"
+      >
+        <span
+          className="text-lg font-extrabold text-brand-600"
+          style={{ fontFamily: 'var(--font-syne, system-ui)' }}
         >
-          <Menu className="h-5 w-5" />
-        </button>
-        <Link href="/dashboard" className="text-base font-bold text-indigo-600 dark:text-indigo-400 lg:hidden">
           FlatMate
-        </Link>
-      </div>
+        </span>
+      </Link>
 
-      <div className="flex items-center gap-1">
+      {/* Desktop spacer */}
+      <div className="hidden lg:block" />
+
+      {/* Right controls */}
+      <div className="flex items-center gap-2">
         <ThemeToggle />
         <NotificationBell />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
-              className="ml-1 flex items-center gap-2 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2"
-              aria-label="Benutzermenu öffnen"
+              className="ml-1 flex items-center gap-2 rounded-full ring-2 ring-transparent hover:ring-brand-600 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
+              aria-label="Benutzermenü"
             >
               <Avatar className="h-8 w-8">
                 {userAvatar && <AvatarImage src={userAvatar} alt={userName ?? 'Benutzer'} />}
-                <AvatarFallback className="text-xs">
+                <AvatarFallback
+                  className="text-xs font-bold bg-brand-muted text-brand-600"
+                >
                   {userName ? getInitials(userName) : 'U'}
                 </AvatarFallback>
               </Avatar>
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel className="font-normal">
+          <DropdownMenuContent align="end" className="w-52 rounded-2xl border-2 border-surface-border">
+            <DropdownMenuLabel className="font-normal pb-2">
               <div className="flex flex-col gap-0.5">
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{userName ?? 'Benutzer'}</p>
-                <p className="text-xs text-gray-500 truncate">{userEmail ?? ''}</p>
+                <p
+                  className="text-sm font-bold text-foreground truncate"
+                  style={{ fontFamily: 'var(--font-syne, system-ui)' }}
+                >
+                  {userName ?? 'Benutzer'}
+                </p>
+                <p className="text-xs text-[var(--text-muted)] truncate">{userEmail ?? ''}</p>
               </div>
             </DropdownMenuLabel>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-surface-border" />
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="cursor-pointer">
-                <User className="mr-2 h-4 w-4" />
+              <Link href="/profile" className="cursor-pointer rounded-xl">
+                <User className="mr-2 h-4 w-4 text-[var(--text-muted)]" />
                 Profil
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator className="bg-surface-border" />
             <DropdownMenuItem
               onClick={handleSignOut}
-              className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400 cursor-pointer"
+              className="text-[var(--danger)] focus:text-[var(--danger)] focus:bg-[var(--danger-bg)] cursor-pointer rounded-xl"
             >
               <LogOut className="mr-2 h-4 w-4" />
               Abmelden
