@@ -43,12 +43,18 @@ function ResetPasswordForm() {
   async function onSubmit(values: Values) {
     setServerError(null)
     try {
-      const res = await fetch('/api/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, password: values.password }) })
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password: values.password }),
+      })
       const data = await res.json()
       if (!res.ok) { setServerError(data.error ?? 'Fehler beim Zurücksetzen.'); return }
       setSuccess(true)
       setTimeout(() => router.push('/login'), 3000)
-    } catch { setServerError('Ein unerwarteter Fehler ist aufgetreten.') }
+    } catch {
+      setServerError('Ein unerwarteter Fehler ist aufgetreten.')
+    }
   }
 
   if (success) return (
@@ -70,8 +76,22 @@ function ResetPasswordForm() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-4">
           {serverError && <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0 mt-0.5" /><span>{serverError}</span></div>}
-          <div className="space-y-2"><Label htmlFor="password">Neues Passwort</Label><div className="relative"><Input id="password" type={showPw ? 'text' : 'password'} className="pr-10" {...register('password')} placeholder="Mindestens 8 Zeichen" /><button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>{errors.password && <p className="text-xs text-red-600">{errors.password.message}</p>}</div>
-          <div className="space-y-2"><Label htmlFor="confirmPassword">Passwort bestätigen</Label><div className="relative"><Input id="confirmPassword" type={showConfirm ? 'text' : 'password'} className="pr-10" {...register('confirmPassword')} placeholder="Passwort wiederholen" /><button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>{errors.confirmPassword && <p className="text-xs text-red-600">{errors.confirmPassword.message}</p>}</div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Neues Passwort</Label>
+            <div className="relative">
+              <Input id="password" type={showPw ? 'text' : 'password'} className="pr-10" {...register('password')} placeholder="Mindestens 8 Zeichen" />
+              <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            </div>
+            {errors.password && <p className="text-xs text-red-600">{errors.password.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Passwort bestätigen</Label>
+            <div className="relative">
+              <Input id="confirmPassword" type={showConfirm ? 'text' : 'password'} className="pr-10" {...register('confirmPassword')} placeholder="Passwort wiederholen" />
+              <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            </div>
+            {errors.confirmPassword && <p className="text-xs text-red-600">{errors.confirmPassword.message}</p>}
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4 pt-2">
           <Button type="submit" className="w-full" disabled={isSubmitting}><KeyRound className="mr-2 h-4 w-4" />{isSubmitting ? 'Speichere…' : 'Passwort speichern'}</Button>
@@ -84,7 +104,11 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense>
+    <Suspense fallback={
+      <Card className="shadow-lg border-0 bg-white dark:bg-gray-900">
+        <CardContent className="pt-10 pb-10 text-center text-gray-400">Laden…</CardContent>
+      </Card>
+    }>
       <ResetPasswordForm />
     </Suspense>
   )

@@ -4,11 +4,12 @@ import { useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2, Save, ChevronUp, ChevronDown, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { getInitials } from '@/lib/utils'
 
 const EMOJIS = ['🍳', '🗑️', '🚭', '🛌', '🧹', '🦺', '🪣', '🦼', '🚿', '🛁', '🪴', '🐾', '📦', '🔧', '🏠', '✨', '🌿', '🛒', '📬', '🎦']
 const COLORS = ['#6366f1', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#f97316', '#14b8a6', '#ec4899', '#84cc16']
@@ -31,16 +32,24 @@ const dutyFormSchema = z.object({
 
 type DutyFormValues = z.infer<typeof dutyFormSchema>
 
+interface Member {
+  id: string
+  name: string
+}
+
 interface DutyFormProps {
   initialValues?: Partial<DutyFormValues>
-  onSubmit: (values: Omit<DutyFormValues, 'checklistItems'> & { checklistItems: string[] }) => Promise<void>
+  initialRotationOrder?: string[]
+  members?: Member[]
+  onSubmit: (values: Omit<DutyFormValues, 'checklistItems'> & { checklistItems: string[]; rotationOrder: string[] }) => Promise<void>
   isLoading?: boolean
   submitLabel?: string
 }
 
-export function DutyForm({ initialValues, onSubmit, isLoading, submitLabel = 'Speichern' }: DutyFormProps) {
+export function DutyForm({ initialValues, initialRotationOrder, members = [], onSubmit, isLoading, submitLabel = 'Speichern' }: DutyFormProps) {
   const [selectedEmoji, setSelectedEmoji] = useState(initialValues?.emoji ?? '')
   const [selectedColor, setSelectedColor] = useState(initialValues?.color ?? '#6366f1')
+  const [rotationOrder, setRotationOrder] = useState<string[]>(initialRotationOrder ?? [])
 
   const { register, handleSubmit, control, formState: { errors }, setValue } = useForm<DutyFormValues>({
     resolver: zodResolver(dutyFormSchema),
@@ -62,11 +71,39 @@ export function DutyForm({ initialValues, onSubmit, isLoading, submitLabel = 'Sp
       emoji: selectedEmoji,
       color: selectedColor,
       checklistItems: values.checklistItems.map((i) => i.value).filter(Boolean),
+      rotationOrder,
     })
   }
 
   function pickEmoji(e: string) { setSelectedEmoji(e); setValue('emoji', e) }
   function pickColor(c: string) { setSelectedColor(c); setValue('color', c) }
+
+  function toggleMember(id: string) {
+    setRotationOrder((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
+    )
+  }
+
+  function moveUp(index: number) {
+    if (index === 0) return
+    setRotationOrder((prev) => {
+      const next = [...prev]
+      ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+      return next
+    })
+  }
+
+  function moveDown(index: number) {
+    setRotationOrder((prev) => {
+      if (index === prev.length - 1) return prev
+      const next = [...prev]
+      ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+      return next
+    })
+  }
+
+  const memberById = Object.fromEntries(members.map((m) => [m.id, m]))
+  const unselectedMembers = members.filter((m) => !rotationOrder.includes(m.id))
 
   return (
     <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
@@ -139,6 +176,84 @@ export function DutyForm({ initialValues, onSubmit, isLoading, submitLabel = 'Sp
           ))}
         </select>
       </div>
+
+      {members.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-gray-500" />
+            <Label>Rotationsreihenfolge</Label>
+          </div>
+
+          {rotationOrder.length > 0 && (
+            <div className="space-y-1 rounded-lg border border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-800/50">
+              {rotationOrder.map((id, index) => {
+                const member = memberById[id]
+                if (!member) return null
+                return (
+                  <div key={id} className="flex items-center gap-2 rounded-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-3 py-2">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                      {getInitials(member.name)}
+                    </span>
+                    <span className="flex-1 text-sm font-medium truncate">{member.name}</span>
+                    <span className="text-xs text-gray-400">#{index + 1}</span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() => moveUp(index)}
+                        disabled={index === 0}
+                        className="p-1 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Nach oben"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveDown(index)}
+                        disabled={index === rotationOrder.length - 1}
+                        className="p-1 rounded text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        aria-label="Nach unten"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleMember(id)}
+                        className="p-1 rounded text-red-400 hover:text-red-600"
+                        aria-label="Entfernen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {unselectedMembers.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-gray-500">Mitglied hinzufügen:</p>
+              <div className="flex flex-wrap gap-2">
+                {unselectedMembers.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => toggleMember(m.id)}
+                    className="flex items-center gap-1.5 rounded-full border border-dashed border-gray-300 dark:border-gray-600 px-3 py-1 text-xs text-gray-600 dark:text-gray-400 hover:border-indigo-400 hover:text-indigo-600 transition-colors"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {m.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {rotationOrder.length === 0 && unselectedMembers.length === 0 && (
+            <p className="text-xs text-gray-400 italic">Keine Mitglieder vorhanden.</p>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label>Checkliste (optional)</Label>

@@ -3,24 +3,23 @@ import { PrismaPg } from '@prisma/adapter-pg'
 
 const g = globalThis as unknown as { _prisma?: PrismaClient }
 
-function createClient(): PrismaClient {
-  const connectionString = process.env.DATABASE_URL
-  if (!connectionString) {
-    throw new Error(
-      'DATABASE_URL ist nicht konfiguriert. ' +
-      'Bitte setze die Variable in Vercel (Project Settings → Environment Variables).'
-    )
+function sanitize(url: string): string {
+  try {
+    const u = new URL(url)
+    u.searchParams.delete('sslmode')
+    u.searchParams.delete('pgbouncer')
+    u.searchParams.delete('connection_limit')
+    return u.toString()
+  } catch {
+    return url
   }
+}
 
-  // Supabase and most managed Postgres providers require SSL in production.
-  // We pass ssl via the pg pool config so it works regardless of whether
-  // the connection string already contains ?sslmode=require.
-  const ssl =
-    process.env.NODE_ENV === 'production' &&
-    !connectionString.includes('sslmode=disable')
-      ? { rejectUnauthorized: false }
-      : undefined
-
+function createClient(): PrismaClient {
+  const raw = process.env.DATABASE_URL
+  if (!raw) throw new Error('DATABASE_URL ist nicht konfiguriert.')
+  const connectionString = sanitize(raw)
+  const ssl = process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined
   const adapter = new PrismaPg({ connectionString, ssl })
   return new PrismaClient({
     adapter,

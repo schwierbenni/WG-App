@@ -37,14 +37,17 @@ function RegisterForm() {
     setServerError(null)
     try {
       const res = await fetch('/api/register', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: values.name, email: values.email, password: values.password, inviteToken: inviteToken ?? undefined }),
       })
       const data = await res.json()
       if (!res.ok) { setServerError(data.error ?? 'Registrierung fehlgeschlagen.'); return }
       setSuccess(true)
       setTimeout(() => router.push('/login'), 2500)
-    } catch { setServerError('Ein unerwarteter Fehler ist aufgetreten.') }
+    } catch {
+      setServerError('Ein unerwarteter Fehler ist aufgetreten.')
+    }
   }
 
   if (success) return (
@@ -68,8 +71,22 @@ function RegisterForm() {
           {serverError && <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 mt-0.5 shrink-0" /><span>{serverError}</span></div>}
           <div className="space-y-2"><Label htmlFor="name">Name</Label><Input id="name" {...register('name')} placeholder="Max Mustermann" />{errors.name && <p className="text-xs text-red-600">{errors.name.message}</p>}</div>
           <div className="space-y-2"><Label htmlFor="email">E-Mail</Label><Input id="email" type="email" {...register('email')} placeholder="name@beispiel.de" />{errors.email && <p className="text-xs text-red-600">{errors.email.message}</p>}</div>
-          <div className="space-y-2"><Label htmlFor="password">Passwort</Label><div className="relative"><Input id="password" type={showPassword ? 'text' : 'password'} className="pr-10" {...register('password')} placeholder="Mindestens 8 Zeichen" /><button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>{errors.password && <p className="text-xs text-red-600">{errors.password.message}</p>}</div>
-          <div className="space-y-2"><Label htmlFor="confirmPassword">Passwort bestätigen</Label><div className="relative"><Input id="confirmPassword" type={showConfirm ? 'text' : 'password'} className="pr-10" {...register('confirmPassword')} placeholder="Passwort wiederholen" /><button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>{errors.confirmPassword && <p className="text-xs text-red-600">{errors.confirmPassword.message}</p>}</div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Passwort</Label>
+            <div className="relative">
+              <Input id="password" type={showPassword ? 'text' : 'password'} className="pr-10" {...register('password')} placeholder="Mindestens 8 Zeichen" />
+              <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            </div>
+            {errors.password && <p className="text-xs text-red-600">{errors.password.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Passwort bestätigen</Label>
+            <div className="relative">
+              <Input id="confirmPassword" type={showConfirm ? 'text' : 'password'} className="pr-10" {...register('confirmPassword')} placeholder="Passwort wiederholen" />
+              <button type="button" onClick={() => setShowConfirm(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
+            </div>
+            {errors.confirmPassword && <p className="text-xs text-red-600">{errors.confirmPassword.message}</p>}
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4 pt-2">
           <Button type="submit" className="w-full" disabled={isSubmitting}><UserPlus className="mr-2 h-4 w-4" />{isSubmitting ? 'Registrieren…' : 'Konto erstellen'}</Button>
@@ -82,7 +99,11 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <Suspense>
+    <Suspense fallback={
+      <Card className="shadow-lg border-0 bg-white dark:bg-gray-900">
+        <CardContent className="pt-10 pb-10 text-center text-gray-400">Laden…</CardContent>
+      </Card>
+    }>
       <RegisterForm />
     </Suspense>
   )
