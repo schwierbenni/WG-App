@@ -93,7 +93,7 @@ function RegisterForm() {
           {inviteToken ? 'Einladung annehmen' : 'Konto erstellen'}
         </h1>
         <p className="text-sm text-[var(--text-muted)]">
-          {inviteToken ? 'Erstelle dein Konto und tritt der WG bei' : 'Registriere dich für FlatMate'}
+          {inviteToken ? 'Erstelle dein Konto und tritt der WG bei' : 'Erstelle dein kostenloses Konto'}
         </p>
       </div>
 
