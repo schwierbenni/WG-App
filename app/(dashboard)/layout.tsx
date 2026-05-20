@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth'
-import { Sidebar } from '@/components/layout/sidebar'
+import { Sidebar, BottomNav } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -13,7 +13,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { name, email, image, role } = session.user
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--surface-muted)]">
+    <div className="flex h-screen overflow-hidden bg-surface-muted">
+      {/* Desktop sidebar */}
       <Sidebar
         userRole={role}
         userName={name ?? undefined}
@@ -28,10 +29,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           userAvatar={image ?? undefined}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        {/* Main content — extra bottom padding on mobile for the bottom nav */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 pb-24 lg:pb-6">
           {children}
         </main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <BottomNav userRole={role} />
     </div>
   )
 }
