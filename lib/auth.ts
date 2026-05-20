@@ -3,10 +3,11 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
+import { authConfig } from '@/auth.config'
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
-  session: { strategy: 'jwt' },
   providers: [
     Credentials({
       credentials: {
@@ -15,31 +16,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
+
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },
         })
+
         if (!user) return null
-        const valid = await bcrypt.compare(credentials.password as string, user.passwordHash)
+
+        const valid = await bcrypt.compare(
+          credentials.password as string,
+          user.passwordHash
+        )
         if (!valid) return null
-        return { id: user.id, name: user.name, email: user.email, role: user.role }
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        }
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id
-        token.role = (user as { role?: string }).role
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-      }
-      return session
-    },
-  },
-  pages: { signIn: '/login' },
 })
