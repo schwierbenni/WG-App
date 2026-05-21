@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 const patchAssignmentSchema = z.union([
   z.object({ action: z.enum(['complete', 'uncomplete']) }),
@@ -90,6 +91,8 @@ export async function PATCH(
       await prisma.notification.create({
         data: { wgId, userId: existing.userId, type: 'ASSIGNMENT', message: notificationMessage },
       })
+
+      sendPushToUser(existing.userId, { title: 'Dienst erledigt', body: notificationMessage, url: '/duties' }).catch(() => {})
     }
 
     return Response.json({ assignment })

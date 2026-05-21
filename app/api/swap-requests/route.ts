@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 const createSwapSchema = z.object({
   toUserId: z.string().min(1, 'toUserId is required'),
@@ -78,14 +79,13 @@ export async function POST(request: Request) {
 
     const fromUser = await prisma.user.findUnique({ where: { id: fromUserId }, select: { name: true } })
 
+    const swapMessage = `${fromUser?.name ?? 'Jemand'} möchte den Dienst "${assignment.duty.name}" mit dir tauschen.`
+
     await prisma.notification.create({
-      data: {
-        wgId,
-        userId: toUserId,
-        type: 'SWAP_REQUEST',
-        message: `${fromUser?.name ?? 'Jemand'} möchte den Dienst "${assignment.duty.name}" mit dir tauschen.`,
-      },
+      data: { wgId, userId: toUserId, type: 'SWAP_REQUEST', message: swapMessage },
     })
+
+    sendPushToUser(toUserId, { title: 'Tausch-Anfrage', body: swapMessage, url: '/duties' }).catch(() => {})
 
     return Response.json({ swapRequest }, { status: 201 })
   } catch (error) {

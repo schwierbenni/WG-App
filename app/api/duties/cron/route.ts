@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { sendPushToUser } from '@/lib/push'
 
 function getNextDueDate(interval: string, from: Date = new Date()): Date {
   const date = new Date(from)
@@ -57,14 +58,13 @@ export async function GET(request: Request) {
           data: { wgId: duty.wgId, dutyId: duty.id, userId: nextUserId, dueDate: nextDueDate },
         })
 
+        const cronMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${nextDueDate.toLocaleDateString('de-DE')}`
+
         await prisma.notification.create({
-          data: {
-            wgId: duty.wgId,
-            userId: nextUserId,
-            type: 'ASSIGNMENT',
-            message: `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${nextDueDate.toLocaleDateString('de-DE')}`,
-          },
+          data: { wgId: duty.wgId, userId: nextUserId, type: 'ASSIGNMENT', message: cronMsg },
         })
+
+        sendPushToUser(nextUserId, { title: 'Neue Zuteilung', body: cronMsg, url: '/duties' }).catch(() => {})
 
         rotated++
         logger.info('Dienst rotiert', { dutyId: duty.id, dutyName: duty.name, nextUserId, wgId: duty.wgId })
