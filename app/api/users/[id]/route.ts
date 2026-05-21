@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
@@ -14,13 +14,14 @@ export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   const { id } = await params
   try {
     const user = await prisma.user.findUnique({
-      where: { id },
+      where: { id, wgId },
       select: { id: true, name: true, email: true, avatarUrl: true, role: true, emailNotifications: true, createdAt: true },
     })
     if (!user) return Response.json({ error: 'Benutzer nicht gefunden.' }, { status: 404 })
@@ -35,8 +36,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { id } = await params
   const isSelf = session.user.id === id
@@ -61,7 +63,7 @@ export async function PATCH(
       if (isSelf) return Response.json({ error: 'Du kannst deine eigene Rolle nicht ändern.' }, { status: 403 })
     }
 
-    const existing = await prisma.user.findUnique({ where: { id } })
+    const existing = await prisma.user.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Benutzer nicht gefunden.' }, { status: 404 })
 
     const data: Record<string, unknown> = {}
@@ -88,8 +90,9 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { id } = await params
   const isSelf = session.user.id === id
@@ -100,7 +103,7 @@ export async function DELETE(
   }
 
   try {
-    const existing = await prisma.user.findUnique({ where: { id } })
+    const existing = await prisma.user.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Benutzer nicht gefunden.' }, { status: 404 })
 
     await prisma.user.delete({ where: { id } })

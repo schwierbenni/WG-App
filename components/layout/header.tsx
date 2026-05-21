@@ -25,6 +25,7 @@ interface HeaderProps {
   userName?: string | null
   userEmail?: string | null
   userAvatar?: string | null
+  wgName?: string
 }
 
 function ThemeToggle() {
@@ -162,7 +163,7 @@ function NotificationBell() {
   )
 }
 
-export function Header({ userName, userEmail, userAvatar }: HeaderProps) {
+export function Header({ userName, userEmail, userAvatar, wgName }: HeaderProps) {
   const router = useRouter()
 
   async function handleSignOut() {
@@ -172,17 +173,17 @@ export function Header({ userName, userEmail, userAvatar }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b-2 border-surface-border bg-surface px-4 shadow-sm">
-      {/* Brand – mobile only */}
+      {/* WG name – mobile only */}
       <Link
         href="/dashboard"
         className="lg:hidden"
-        aria-label="FlatMate Dashboard"
+        aria-label="Dashboard"
       >
         <span
           className="text-lg font-extrabold text-brand-600"
           style={{ fontFamily: 'var(--font-syne, system-ui)' }}
         >
-          FlatMate
+          {wgName ?? 'Meine WG'}
         </span>
       </Link>
 

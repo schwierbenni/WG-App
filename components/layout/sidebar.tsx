@@ -31,6 +31,7 @@ const mainNavItems: NavItem[] = [
 const adminNavItems: NavItem[] = [
   { href: '/admin/duties',   label: 'Dienste verwalten', icon: Settings, adminOnly: true },
   { href: '/admin/members',  label: 'Mitglieder',        icon: Users,    adminOnly: true },
+  { href: '/admin/wg',       label: 'WG-Einstellungen',  icon: Home,     adminOnly: true },
 ]
 
 interface SidebarProps {
@@ -38,6 +39,7 @@ interface SidebarProps {
   userName?: string
   userEmail?: string
   userAvatar?: string | null
+  wgName?: string
 }
 
 /* ─── Desktop sidebar nav link ──────────────────────────────────────────── */
@@ -66,7 +68,7 @@ function SidebarNavLink({ item, onClick }: { item: NavItem; onClick?: () => void
 }
 
 /* ─── Desktop sidebar content ───────────────────────────────────────────── */
-function SidebarContent({ userRole, onLinkClick }: { userRole?: string; onLinkClick?: () => void }) {
+function SidebarContent({ userRole, wgName, onLinkClick }: { userRole?: string; wgName?: string; onLinkClick?: () => void }) {
   const isAdmin = userRole === 'ADMIN'
 
   return (
@@ -76,12 +78,12 @@ function SidebarContent({ userRole, onLinkClick }: { userRole?: string; onLinkCl
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-600)] shadow-md">
           <Home className="h-4 w-4 text-white" />
         </div>
-        <div>
+        <div className="min-w-0">
           <span
-            className="text-base font-extrabold text-white leading-none"
+            className="block text-base font-extrabold text-white leading-none truncate"
             style={{ fontFamily: 'var(--font-syne, system-ui)' }}
           >
-            FlatMate
+            {wgName ?? 'Meine WG'}
           </span>
           <p className="text-[10px] text-[var(--sidebar-text)] leading-tight mt-0.5 tracking-widest uppercase">
             WG-App
@@ -121,13 +123,13 @@ function SidebarContent({ userRole, onLinkClick }: { userRole?: string; onLinkCl
 }
 
 /* ─── Desktop sidebar ───────────────────────────────────────────────────── */
-export function Sidebar({ userRole }: SidebarProps) {
+export function Sidebar({ userRole, wgName }: SidebarProps) {
   return (
     <aside
       className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 h-full"
       style={{ background: 'var(--sidebar-bg)' }}
     >
-      <SidebarContent userRole={userRole} />
+      <SidebarContent userRole={userRole} wgName={wgName} />
     </aside>
   )
 }

@@ -8,6 +8,7 @@ import {
   AlertCircle,
   RefreshCw,
   User,
+  UserPlus,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +16,12 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { SwapDialog } from '@/components/duties/swap-dialog'
 import { cn, formatDate, getInitials, getIntervalLabel } from '@/lib/utils'
 
@@ -78,6 +85,10 @@ function StatusBadge({ status }: { status: 'offen' | 'erledigt' | 'überfällig'
   )
 }
 
+interface AssignDialogState {
+  duty: DutyWithAssignment
+}
+
 export default function DutiesPage() {
   const { data: session } = useSession()
   const [duties, setDuties] = React.useState<DutyWithAssignment[]>([])
@@ -86,6 +97,11 @@ export default function DutiesPage() {
   const [error, setError] = React.useState('')
   const [filter, setFilter] = React.useState<FilterTab>('all')
   const [completing, setCompleting] = React.useState<string | null>(null)
+  const [assignDialog, setAssignDialog] = React.useState<AssignDialogState | null>(null)
+  const [assignUserId, setAssignUserId] = React.useState('')
+  const [assignDueDate, setAssignDueDate] = React.useState('')
+  const [assigning, setAssigning] = React.useState(false)
+  const [assignError, setAssignError] = React.useState('')
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -137,6 +153,41 @@ export default function DutiesPage() {
       if (res.ok) await fetchData()
     } finally {
       setCompleting(null)
+    }
+  }
+
+  function openAssignDialog(duty: DutyWithAssignment) {
+    const defaultDate = new Date()
+    defaultDate.setDate(defaultDate.getDate() + 7)
+    setAssignUserId('')
+    setAssignDueDate(defaultDate.toISOString().slice(0, 10))
+    setAssignError('')
+    setAssignDialog({ duty })
+  }
+
+  async function handleAssign() {
+    if (!assignDialog || !assignUserId || !assignDueDate) return
+    setAssigning(true)
+    setAssignError('')
+    try {
+      const res = await fetch('/api/assignments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dutyId: assignDialog.duty.id,
+          userId: assignUserId,
+          dueDate: new Date(assignDueDate).toISOString(),
+        }),
+      })
+      if (res.ok) {
+        setAssignDialog(null)
+        await fetchData()
+      } else {
+        const data = await res.json()
+        setAssignError(data.error ?? 'Fehler beim Zuweisen')
+      }
+    } finally {
+      setAssigning(false)
     }
   }
 
@@ -333,9 +384,22 @@ export default function DutiesPage() {
                       )}
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-400">
-                      <User className="h-4 w-4" />
-                      Keine aktive Zuweisung
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-400">
+                        <User className="h-4 w-4" />
+                        Keine aktive Zuweisung
+                      </div>
+                      {!duty.isPaused && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openAssignDialog(duty)}
+                          className="w-full gap-1.5 text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          Mitglied zuweisen
+                        </Button>
+                      )}
                     </div>
                   )}
                 </CardContent>
@@ -344,6 +408,59 @@ export default function DutiesPage() {
           })}
         </div>
       )}
+
+      {/* Assign duty dialog */}
+      <Dialog open={!!assignDialog} onOpenChange={(open) => !open && setAssignDialog(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {assignDialog?.duty.emoji && <span className="mr-2">{assignDialog.duty.emoji}</span>}
+              {assignDialog?.duty.name} zuweisen
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="assign-user">Mitglied</Label>
+              <Select
+                id="assign-user"
+                value={assignUserId}
+                onChange={(e) => setAssignUserId(e.target.value)}
+                placeholder="Mitglied auswählen…"
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="assign-date">Fälligkeitsdatum</Label>
+              <Input
+                id="assign-date"
+                type="date"
+                value={assignDueDate}
+                onChange={(e) => setAssignDueDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+              />
+            </div>
+
+            {assignError && (
+              <p className="text-sm text-red-600">{assignError}</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialog(null)}>Abbrechen</Button>
+            <Button
+              onClick={handleAssign}
+              disabled={assigning || !assignUserId || !assignDueDate}
+            >
+              {assigning ? 'Zuweisen…' : 'Zuweisen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
