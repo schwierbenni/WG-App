@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const updateDutySchema = z.object({
@@ -18,14 +18,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   const { id } = await params
 
   try {
     const duty = await prisma.duty.findUnique({
-      where: { id },
+      where: { id, wgId },
       include: {
         assignments: {
           include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
@@ -48,8 +49,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
+
   if (session.user.role !== 'ADMIN') return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
@@ -61,6 +64,9 @@ export async function PATCH(
     if (!parsed.success) {
       return Response.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 })
     }
+
+    const existing = await prisma.duty.findUnique({ where: { id, wgId } })
+    if (!existing) return Response.json({ error: 'Duty not found' }, { status: 404 })
 
     const duty = await prisma.duty.update({ where: { id }, data: parsed.data })
 
@@ -75,13 +81,18 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
+
   if (session.user.role !== 'ADMIN') return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
 
   try {
+    const existing = await prisma.duty.findUnique({ where: { id, wgId } })
+    if (!existing) return Response.json({ error: 'Duty not found' }, { status: 404 })
+
     await prisma.duty.delete({ where: { id } })
     return new Response(null, { status: 204 })
   } catch (error) {

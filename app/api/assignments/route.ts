@@ -48,10 +48,6 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response
   const { session, wgId } = auth
 
-  if (session.user.role !== 'ADMIN') {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
-
   try {
     const body = await request.json()
     const parsed = createAssignmentSchema.safeParse(body)
