@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 const patchSwapSchema = z.object({
   action: z.enum(['accept', 'reject']),
@@ -90,16 +91,26 @@ export async function PATCH(
         data: { userId: swapRequest.toUserId },
       })
 
+      const acceptMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" angenommen.`
+      const assignMsg = `Du wurdest nach dem Tausch für "${swapRequest.assignment.duty.name}" eingeteilt.`
+
       await prisma.notification.createMany({
         data: [
-          { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" angenommen.` },
-          { wgId, userId: swapRequest.toUserId, type: 'ASSIGNMENT', message: `Du wurdest nach dem Tausch für "${swapRequest.assignment.duty.name}" eingeteilt.` },
+          { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: acceptMsg },
+          { wgId, userId: swapRequest.toUserId, type: 'ASSIGNMENT', message: assignMsg },
         ],
       })
+
+      sendPushToUser(swapRequest.fromUserId, { title: 'Tausch angenommen', body: acceptMsg, url: '/duties' }).catch(() => {})
+      sendPushToUser(swapRequest.toUserId, { title: 'Neue Zuteilung', body: assignMsg, url: '/duties' }).catch(() => {})
     } else {
+      const rejectMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" abgelehnt.`
+
       await prisma.notification.create({
-        data: { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" abgelehnt.` },
+        data: { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: rejectMsg },
       })
+
+      sendPushToUser(swapRequest.fromUserId, { title: 'Tausch abgelehnt', body: rejectMsg, url: '/duties' }).catch(() => {})
     }
 
     return Response.json({ swapRequest: updated })

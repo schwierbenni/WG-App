@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { sendPushToWG } from '@/lib/push'
 
 const createAnnouncementSchema = z.object({
   content: z.string().min(1, 'Content is required').max(500, 'Content must be 500 characters or less'),
@@ -65,16 +66,25 @@ export async function POST(request: Request) {
       select: { id: true },
     })
 
+    const announcementPreview = parsed.data.content.slice(0, 80) + (parsed.data.content.length > 80 ? '…' : '')
+    const announcementMsg = `Neue Ankündigung: "${announcementPreview}"`
+
     if (wgMembers.length > 0) {
       await prisma.notification.createMany({
         data: wgMembers.map((user: { id: string }) => ({
           wgId,
           userId: user.id,
           type: 'ANNOUNCEMENT' as const,
-          message: `Neue Ankündigung: "${parsed.data.content.slice(0, 80)}${parsed.data.content.length > 80 ? '...' : ''}"`,
+          message: announcementMsg,
         })),
       })
     }
+
+    sendPushToWG(
+      wgId,
+      { title: `📌 ${announcement.author.name}`, body: announcementPreview, url: '/announcements' },
+      session.user.id
+    ).catch(() => {})
 
     return Response.json({ announcement }, { status: 201 })
   } catch (error) {

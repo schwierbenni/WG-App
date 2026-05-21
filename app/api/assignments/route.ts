@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { sendPushToUser } from '@/lib/push'
 
 const createAssignmentSchema = z.object({
   dutyId: z.string().min(1, 'dutyId is required'),
@@ -72,14 +73,13 @@ export async function POST(request: Request) {
       },
     })
 
+    const assignMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${new Date(dueDate).toLocaleDateString('de-DE')}`
+
     await prisma.notification.create({
-      data: {
-        wgId,
-        userId,
-        type: 'ASSIGNMENT',
-        message: `You have been assigned to "${duty.name}". Due: ${new Date(dueDate).toLocaleDateString()}`,
-      },
+      data: { wgId, userId, type: 'ASSIGNMENT', message: assignMsg },
     })
+
+    sendPushToUser(userId, { title: 'Neue Zuteilung', body: assignMsg, url: '/duties' }).catch(() => {})
 
     return Response.json({ assignment }, { status: 201 })
   } catch (error) {
