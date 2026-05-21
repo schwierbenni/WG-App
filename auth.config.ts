@@ -13,12 +13,15 @@ export const authConfig: NextAuthConfig = {
       return token
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        session.user.wgId = token.wgId as string
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: token.id as string,
+          role: (token.role ?? '') as string,
+          wgId: (token.wgId ?? '') as string,
+        },
       }
-      return session
     },
   },
   pages: {
