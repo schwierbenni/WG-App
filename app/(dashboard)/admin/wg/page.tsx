@@ -3,86 +3,73 @@
 import * as React from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Settings, Link as LinkIcon, Copy, Check, Save, RefreshCw } from 'lucide-react'
+import {
+  Settings, Plus, Link as LinkIcon, Copy, Check, Save,
+  RefreshCw, Users, Pencil, X,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
-export default function WgSettingsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+interface WgItem {
+  id: string
+  name: string
+  createdAt: string
+  _count: { members: number }
+}
 
-  const [wgName, setWgName] = React.useState('')
-  const [nameInput, setNameInput] = React.useState('')
-  const [savingName, setSavingName] = React.useState(false)
-  const [nameError, setNameError] = React.useState('')
-  const [nameSaved, setNameSaved] = React.useState(false)
+interface WgCardProps {
+  wg: WgItem
+  isCurrentWg: boolean
+  onRenamed: (id: string, name: string) => void
+}
+
+function WgCard({ wg, isCurrentWg, onRenamed }: WgCardProps) {
+  const [editing, setEditing] = React.useState(false)
+  const [nameInput, setNameInput] = React.useState(wg.name)
+  const [saving, setSaving] = React.useState(false)
+  const [saveError, setSaveError] = React.useState('')
 
   const [inviteLink, setInviteLink] = React.useState('')
-  const [generatingLink, setGeneratingLink] = React.useState(false)
+  const [generating, setGenerating] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
 
-  const [loading, setLoading] = React.useState(true)
-
-  React.useEffect(() => {
-    if (status === 'loading') return
-    if (!session || session.user.role !== 'ADMIN') {
-      router.replace('/dashboard')
-    }
-  }, [session, status, router])
-
-  React.useEffect(() => {
-    if (session?.user?.role !== 'ADMIN') return
-    setLoading(true)
-    fetch('/api/wg')
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.wg) {
-          setWgName(data.wg.name)
-          setNameInput(data.wg.name)
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [session])
-
-  async function handleSaveName(e: React.FormEvent) {
-    e.preventDefault()
-    if (!nameInput.trim()) return
-    setSavingName(true)
-    setNameError('')
-    setNameSaved(false)
+  async function handleSave() {
+    if (!nameInput.trim() || nameInput.trim() === wg.name) { setEditing(false); return }
+    setSaving(true)
+    setSaveError('')
     try {
-      const res = await fetch('/api/wg', {
+      const res = await fetch(`/api/admin/wgs/${wg.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: nameInput.trim() }),
       })
       const data = await res.json()
       if (res.ok) {
-        setWgName(data.wg.name)
-        setNameSaved(true)
-        setTimeout(() => setNameSaved(false), 2500)
+        onRenamed(wg.id, data.wg.name)
+        setEditing(false)
       } else {
-        setNameError(data.error ?? 'Fehler beim Speichern')
+        setSaveError(data.error ?? 'Fehler beim Speichern')
       }
     } finally {
-      setSavingName(false)
+      setSaving(false)
     }
   }
 
   async function handleGenerateInvite() {
-    setGeneratingLink(true)
+    setGenerating(true)
     try {
-      const res = await fetch('/api/invite')
+      const res = await fetch(`/api/invite?wgId=${wg.id}`)
       if (res.ok) {
         const data = await res.json()
         setInviteLink(data.url)
       }
     } finally {
-      setGeneratingLink(false)
+      setGenerating(false)
     }
   }
 
@@ -95,6 +82,152 @@ export default function WgSettingsPage() {
     } catch { /* ignore */ }
   }
 
+  return (
+    <Card className={cn('transition-shadow', isCurrentWg && 'ring-2 ring-indigo-200')}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSave()
+                    if (e.key === 'Escape') { setEditing(false); setNameInput(wg.name) }
+                  }}
+                  autoFocus
+                  className="h-8 text-sm font-semibold"
+                  maxLength={100}
+                />
+                <Button size="sm" variant="ghost" onClick={handleSave} disabled={saving} className="h-8 w-8 p-0 text-green-600 hover:text-green-700">
+                  {saving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setNameInput(wg.name) }} className="h-8 w-8 p-0 text-gray-400">
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base truncate">{wg.name}</CardTitle>
+                {isCurrentWg && (
+                  <Badge className="bg-indigo-100 text-indigo-700 text-xs shrink-0">Deine WG</Badge>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => { setEditing(true); setNameInput(wg.name) }}
+                  className="h-7 w-7 p-0 text-gray-400 hover:text-gray-600 shrink-0"
+                  title="Umbenennen"
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            {saveError && <p className="text-xs text-red-600 mt-1">{saveError}</p>}
+          </div>
+          <div className="flex items-center gap-1.5 text-sm text-gray-500 shrink-0">
+            <Users className="h-4 w-4" />
+            <span className="font-medium">{wg._count.members}</span>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleGenerateInvite}
+          disabled={generating}
+          className="w-full gap-1.5"
+        >
+          <LinkIcon className="h-4 w-4" />
+          {generating ? 'Generiere…' : 'Einladungslink generieren'}
+        </Button>
+
+        {inviteLink && (
+          <div className="space-y-1.5">
+            <div className="flex gap-2">
+              <Input
+                value={inviteLink}
+                readOnly
+                className="text-xs font-mono text-gray-600 h-8"
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+              />
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={handleCopy} title="Kopieren">
+                {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            {copied && <p className="text-xs text-green-600">Kopiert!</p>}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+export default function WgManagementPage() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  const [wgs, setWgs] = React.useState<WgItem[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [loadError, setLoadError] = React.useState('')
+
+  const [newName, setNewName] = React.useState('')
+  const [creating, setCreating] = React.useState(false)
+  const [createError, setCreateError] = React.useState('')
+
+  React.useEffect(() => {
+    if (status === 'loading') return
+    if (!session || session.user.role !== 'ADMIN') router.replace('/dashboard')
+  }, [session, status, router])
+
+  const fetchWgs = React.useCallback(async () => {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const res = await fetch('/api/admin/wgs')
+      if (!res.ok) throw new Error('Fehler beim Laden der WGs')
+      const data = await res.json()
+      setWgs(data.wgs ?? [])
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (session?.user?.role === 'ADMIN') fetchWgs()
+  }, [session, fetchWgs])
+
+  function handleRenamed(id: string, name: string) {
+    setWgs((prev) => prev.map((w) => (w.id === id ? { ...w, name } : w)))
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newName.trim()) return
+    setCreating(true)
+    setCreateError('')
+    try {
+      const res = await fetch('/api/admin/wgs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setWgs((prev) => [...prev, data.wg])
+        setNewName('')
+      } else {
+        setCreateError(data.error ?? 'Fehler beim Erstellen')
+      }
+    } finally {
+      setCreating(false)
+    }
+  }
+
   if (status === 'loading' || (session && session.user.role !== 'ADMIN')) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -103,93 +236,83 @@ export default function WgSettingsPage() {
     )
   }
 
+  const currentWgId = (session?.user as { wgId?: string })?.wgId
+
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center gap-2">
-        <Settings className="h-6 w-6 text-indigo-600" />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">WG-Einstellungen</h1>
-          <p className="text-sm text-gray-500">WG konfigurieren und Mitglieder einladen</p>
+    <div className="space-y-6 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Settings className="h-6 w-6 text-indigo-600" />
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">WG-Verwaltung</h1>
+            <p className="text-sm text-gray-500">WGs erstellen, umbenennen und Mitglieder einladen</p>
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={fetchWgs} disabled={loading}>
+          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          <span className="hidden sm:inline">Aktualisieren</span>
+        </Button>
       </div>
 
-      {/* WG Name */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Name der WG</CardTitle>
-          <CardDescription>
-            Dieser Name wird im Navigationsmenü für alle Mitglieder angezeigt.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="h-10 w-full animate-pulse rounded-md bg-gray-100" />
-          ) : (
-            <form onSubmit={handleSaveName} className="flex gap-2">
-              <div className="flex-1 space-y-1">
-                <Label htmlFor="wg-name" className="sr-only">WG-Name</Label>
-                <Input
-                  id="wg-name"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder="Name der WG"
-                  maxLength={100}
-                />
-                {nameError && <p className="text-xs text-red-600">{nameError}</p>}
-              </div>
-              <Button
-                type="submit"
-                disabled={savingName || nameInput.trim() === wgName || !nameInput.trim()}
-              >
-                {savingName ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : nameSaved ? (
-                  <Check className={cn('h-4 w-4 text-green-500')} />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                {nameSaved ? 'Gespeichert' : 'Speichern'}
-              </Button>
-            </form>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Invite */}
+      {/* Create new WG */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <LinkIcon className="h-5 w-5 text-indigo-500" />
-            Mitglied einladen
+            <Plus className="h-5 w-5 text-indigo-500" />
+            Neue WG anlegen
           </CardTitle>
           <CardDescription>
-            Generiere einen Einladungslink (gültig für 7 Tage). Jeder Link kann nur einmal verwendet werden.
+            Erstelle eine neue WG und generiere danach einen Einladungslink.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <Button variant="outline" onClick={handleGenerateInvite} disabled={generatingLink}>
-            <LinkIcon className="h-4 w-4" />
-            {generatingLink ? 'Generiere…' : 'Einladungslink generieren'}
-          </Button>
-
-          {inviteLink && (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input
-                  value={inviteLink}
-                  readOnly
-                  className="text-xs font-mono text-gray-600"
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                />
-                <Button variant="outline" size="icon" onClick={handleCopy} title="Link kopieren">
-                  {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-              {copied && <p className="text-xs text-green-600">Link in die Zwischenablage kopiert!</p>}
+        <CardContent>
+          <form onSubmit={handleCreate} className="flex gap-2">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="new-wg-name" className="sr-only">WG-Name</Label>
+              <Input
+                id="new-wg-name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Name der neuen WG…"
+                maxLength={100}
+                disabled={creating}
+              />
+              {createError && <p className="text-xs text-red-600">{createError}</p>}
             </div>
-          )}
+            <Button type="submit" disabled={creating || !newName.trim()}>
+              {creating ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Anlegen
+            </Button>
+          </form>
         </CardContent>
       </Card>
+
+      {/* WG list */}
+      {loadError ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{loadError}</div>
+      ) : loading ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader><Skeleton className="h-5 w-36" /></CardHeader>
+              <CardContent><Skeleton className="h-9 w-full" /></CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : wgs.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-8">Keine WGs gefunden</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {wgs.map((wg) => (
+            <WgCard
+              key={wg.id}
+              wg={wg}
+              isCurrentWg={wg.id === currentWgId}
+              onRenamed={handleRenamed}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
