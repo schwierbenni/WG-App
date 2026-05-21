@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       if (duty.rotationInterval === 'MANUAL') continue
 
       const lastAssignment = await prisma.dutyAssignment.findFirst({
-        where: { dutyId: duty.id },
+        where: { dutyId: duty.id, wgId: duty.wgId },
         orderBy: { createdAt: 'desc' },
       })
 
@@ -48,17 +48,18 @@ export async function GET(request: Request) {
         const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % duty.rotationOrder.length
         const nextUserId = duty.rotationOrder[nextIndex]
 
-        const nextUser = await prisma.user.findUnique({ where: { id: nextUserId } })
+        const nextUser = await prisma.user.findUnique({ where: { id: nextUserId, wgId: duty.wgId } })
         if (!nextUser) continue
 
         const nextDueDate = getNextDueDate(duty.rotationInterval)
 
         await prisma.dutyAssignment.create({
-          data: { dutyId: duty.id, userId: nextUserId, dueDate: nextDueDate },
+          data: { wgId: duty.wgId, dutyId: duty.id, userId: nextUserId, dueDate: nextDueDate },
         })
 
         await prisma.notification.create({
           data: {
+            wgId: duty.wgId,
             userId: nextUserId,
             type: 'ASSIGNMENT',
             message: `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${nextDueDate.toLocaleDateString('de-DE')}`,
@@ -66,7 +67,7 @@ export async function GET(request: Request) {
         })
 
         rotated++
-        logger.info('Dienst rotiert', { dutyId: duty.id, dutyName: duty.name, nextUserId })
+        logger.info('Dienst rotiert', { dutyId: duty.id, dutyName: duty.name, nextUserId, wgId: duty.wgId })
       } catch (err) {
         errors.push(`${duty.name}: ${String(err)}`)
         logger.error('Fehler bei Dienstrotation', { dutyId: duty.id, error: String(err) })

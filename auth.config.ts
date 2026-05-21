@@ -8,6 +8,7 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id
         token.role = (user as { role?: string }).role
+        token.wgId = (user as { wgId?: string }).wgId
       }
       return token
     },
@@ -15,6 +16,7 @@ export const authConfig: NextAuthConfig = {
       if (token) {
         session.user.id = token.id as string
         session.user.role = token.role as string
+        session.user.wgId = token.wgId as string
       }
       return session
     },

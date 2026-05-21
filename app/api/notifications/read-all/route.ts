@@ -1,13 +1,14 @@
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 export async function POST() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     await prisma.notification.updateMany({
-      where: { userId: session.user.id, readAt: null },
+      where: { userId: session.user.id, wgId, readAt: null },
       data: { readAt: new Date() },
     })
     return Response.json({ message: 'All notifications marked as read' })

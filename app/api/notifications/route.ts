@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const patchNotificationsSchema = z.object({
@@ -7,12 +7,13 @@ const patchNotificationsSchema = z.object({
 })
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     const notifications = await prisma.notification.findMany({
-      where: { userId: session.user.id },
+      where: { userId: session.user.id, wgId },
       orderBy: [{ readAt: 'asc' }, { createdAt: 'desc' }],
       take: 50,
     })
@@ -30,8 +31,9 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     const body = await request.json()
@@ -42,7 +44,7 @@ export async function PATCH(request: Request) {
     }
 
     await prisma.notification.updateMany({
-      where: { userId: session.user.id, readAt: null },
+      where: { userId: session.user.id, wgId, readAt: null },
       data: { readAt: new Date() },
     })
 

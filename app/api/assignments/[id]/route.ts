@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const patchAssignmentSchema = z.union([
@@ -15,14 +15,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   const { id } = await params
 
   try {
     const assignment = await prisma.dutyAssignment.findUnique({
-      where: { id },
+      where: { id, wgId },
       include: {
         duty: true,
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -42,8 +43,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { id } = await params
 
@@ -55,7 +57,7 @@ export async function PATCH(
       return Response.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const existing = await prisma.dutyAssignment.findUnique({ where: { id }, include: { duty: true } })
+    const existing = await prisma.dutyAssignment.findUnique({ where: { id, wgId }, include: { duty: true } })
     if (!existing) return Response.json({ error: 'Assignment not found' }, { status: 404 })
 
     let updateData: Record<string, unknown> = {}
@@ -86,7 +88,7 @@ export async function PATCH(
 
     if (notificationMessage) {
       await prisma.notification.create({
-        data: { userId: existing.userId, type: 'ASSIGNMENT', message: notificationMessage },
+        data: { wgId, userId: existing.userId, type: 'ASSIGNMENT', message: notificationMessage },
       })
     }
 
@@ -101,13 +103,18 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
+
   if (session.user.role !== 'ADMIN') return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   const { id } = await params
 
   try {
+    const existing = await prisma.dutyAssignment.findUnique({ where: { id, wgId } })
+    if (!existing) return Response.json({ error: 'Assignment not found' }, { status: 404 })
+
     await prisma.dutyAssignment.delete({ where: { id } })
     return new Response(null, { status: 204 })
   } catch (error) {

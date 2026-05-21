@@ -62,8 +62,24 @@ export async function POST(request: Request) {
     const userCount = await prisma.user.count()
     const isFirstUser = userCount === 0
 
-    // Wenn ein Invite-Token mitgeschickt wurde, trotzdem validieren (optional)
-    if (inviteToken) {
+    let wgId: string
+    let role: 'ADMIN' | 'MEMBER'
+
+    if (isFirstUser) {
+      // First user creates the WG and becomes ADMIN
+      const wgConfig = await prisma.wGConfig.findFirst()
+      const wg = wgConfig ?? await prisma.wGConfig.create({ data: { name: 'Meine WG' } })
+      wgId = wg.id
+      role = 'ADMIN'
+    } else {
+      // Every subsequent user MUST have a valid invite token
+      if (!inviteToken) {
+        return Response.json(
+          { error: 'Für die Registrierung ist ein Einladungslink erforderlich.' },
+          { status: 403 }
+        )
+      }
+
       const token = await prisma.inviteToken.findUnique({ where: { token: inviteToken } })
       if (!token) {
         return Response.json({ error: 'Dieser Einladungslink ist ungültig.' }, { status: 400 })
@@ -77,6 +93,9 @@ export async function POST(request: Request) {
         return Response.json({ error: 'Dieser Einladungslink ist abgelaufen.' }, { status: 403 })
       }
 
+      wgId = token.wgId
+      role = 'MEMBER'
+
       await prisma.inviteToken.update({
         where: { token: inviteToken },
         data: { usedAt: new Date() },
@@ -85,25 +104,21 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(password, 10)
     const user = await prisma.user.create({
-      data: { name, email, passwordHash, role: isFirstUser ? 'ADMIN' : 'MEMBER' },
-      select: { id: true, name: true, email: true, role: true, createdAt: true },
+      data: { wgId, name, email, passwordHash, role },
+      select: { id: true, name: true, email: true, role: true, wgId: true, createdAt: true },
     })
 
-    logger.info('Benutzer erstellt', { userId: user.id, email, role: user.role })
+    logger.info('Benutzer erstellt', { userId: user.id, email, role: user.role, wgId })
 
     if (isFirstUser) {
-      const wgConfig = await prisma.wGConfig.findFirst()
-      if (!wgConfig) {
-        await prisma.wGConfig.create({ data: { name: 'Meine WG' } })
-        await Promise.all(
-          PREDEFINED_DUTIES.map((duty) =>
-            prisma.duty.create({
-              data: { ...duty, rotationOrder: [user.id] },
-            })
-          )
+      await Promise.all(
+        PREDEFINED_DUTIES.map((duty) =>
+          prisma.duty.create({
+            data: { ...duty, wgId, rotationOrder: [user.id] },
+          })
         )
-        logger.info('WG-Konfiguration und Standard-Dienste erstellt', { userId: user.id })
-      }
+      )
+      logger.info('Standard-Dienste erstellt', { userId: user.id, wgId })
     }
 
     return Response.json({ user }, { status: 201 })

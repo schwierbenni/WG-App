@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 interface Settlement {
@@ -10,12 +10,13 @@ interface Settlement {
 }
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   try {
     const expenses = await prisma.expense.findMany({
-      where: { settledAt: null },
+      where: { wgId, settledAt: null },
       include: { paidByUser: { select: { id: true, name: true } } },
     })
 
@@ -26,7 +27,7 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
-      where: { id: { in: Array.from(allUserIds) } },
+      where: { id: { in: Array.from(allUserIds) }, wgId },
       select: { id: true, name: true },
     })
     const userMap = new Map<string, string>(users.map((u: { id: string; name: string }) => [u.id, u.name] as [string, string]))

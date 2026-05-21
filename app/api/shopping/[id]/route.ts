@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const patchItemSchema = z.object({
@@ -10,8 +10,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   const { id } = await params
 
@@ -23,7 +24,7 @@ export async function PATCH(
       return Response.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const existing = await prisma.shoppingItem.findUnique({ where: { id } })
+    const existing = await prisma.shoppingItem.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Shopping item not found' }, { status: 404 })
 
     const item = await prisma.shoppingItem.update({
@@ -43,13 +44,14 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   const { id } = await params
 
   try {
-    const existing = await prisma.shoppingItem.findUnique({ where: { id } })
+    const existing = await prisma.shoppingItem.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Shopping item not found' }, { status: 404 })
 
     await prisma.shoppingItem.delete({ where: { id } })
