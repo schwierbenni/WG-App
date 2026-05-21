@@ -9,6 +9,7 @@ export type WgSession = {
     email?: string | null
     image?: string | null
   }
+  expires: string
 }
 
 type AuthResult =
@@ -16,7 +17,10 @@ type AuthResult =
   | { ok: false; response: Response }
 
 export async function requireWgSession(): Promise<AuthResult> {
-  const session = await auth()
+  // Cast to unknown first: next-auth v5 beta's returned Session type does not
+  // always reflect module augmentation, causing false TS errors on .wgId
+  const session = (await auth()) as unknown as WgSession | null
+
   if (!session) {
     return { ok: false, response: new Response('Unauthorized', { status: 401 }) }
   }
@@ -29,5 +33,5 @@ export async function requireWgSession(): Promise<AuthResult> {
       ),
     }
   }
-  return { ok: true, session: session as WgSession, wgId: session.user.wgId }
+  return { ok: true, session, wgId: session.user.wgId }
 }
