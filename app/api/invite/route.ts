@@ -10,10 +10,18 @@ const validateSchema = z.object({
 export async function GET(request: Request) {
   const auth = await requireWgSession()
   if (!auth.ok) return auth.response
-  const { session, wgId } = auth
+  const { session, wgId: sessionWgId } = auth
 
   if (session.user.role !== 'ADMIN') {
     return Response.json({ error: 'Nur Admins können Einladungslinks erstellen.' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(request.url)
+  const targetWgId = searchParams.get('wgId') ?? sessionWgId
+
+  if (targetWgId !== sessionWgId) {
+    const targetWg = await prisma.wGConfig.findUnique({ where: { id: targetWgId }, select: { id: true } })
+    if (!targetWg) return Response.json({ error: 'WG nicht gefunden.' }, { status: 404 })
   }
 
   try {
@@ -21,14 +29,14 @@ export async function GET(request: Request) {
     expiresAt.setDate(expiresAt.getDate() + 7)
 
     const invite = await prisma.inviteToken.create({
-      data: { wgId, createdBy: session.user.id, expiresAt },
+      data: { wgId: targetWgId, createdBy: session.user.id, expiresAt },
     })
 
     const baseUrl = new URL(request.url).origin
     const url = `${baseUrl}/register?token=${invite.token}`
 
-    logger.info('Einladungslink erstellt', { by: session.user.id, token: invite.token, expiresAt, wgId })
-    return Response.json({ token: invite.token, url })
+    logger.info('Einladungslink erstellt', { by: session.user.id, token: invite.token, expiresAt, wgId: targetWgId })
+    return Response.json({ token: invite.token, url, wgId: targetWgId })
   } catch (error) {
     logger.error('GET /api/invite fehlgeschlagen', { error: error instanceof Error ? error.message : String(error) })
     return Response.json({ error: 'Einladungslink konnte nicht erstellt werden.' }, { status: 500 })
