@@ -18,6 +18,7 @@ import {
   Receipt,
   TrendingUp,
   Wallet,
+  Trash2,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -82,6 +83,8 @@ export default function ExpensesPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
   const [settleLoading, setSettleLoading] = React.useState<string | null>(null)
+
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
   const [showForm, setShowForm] = React.useState(false)
   const [amount, setAmount] = React.useState('')
@@ -172,11 +175,30 @@ export default function ExpensesPage() {
     }
   }
 
+  const handleDelete = async (expenseId: string) => {
+    setDeletingId(expenseId)
+    try {
+      const res = await fetch(`/api/expenses/${expenseId}`, { method: 'DELETE' })
+      if (res.ok) {
+        setExpenses((prev) => prev.filter((e) => e.id !== expenseId))
+        fetchData() // refresh settlements too
+      }
+    } catch {
+      // ignore
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   const handleSettle = async (settlement: Settlement) => {
     const key = `${settlement.fromUserId}-${settlement.toUserId}`
     setSettleLoading(key)
     try {
-      await fetch('/api/expenses')
+      await fetch('/api/expenses/settlements', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromUserId: settlement.fromUserId, toUserId: settlement.toUserId }),
+      })
       fetchData()
     } catch {
       // ignore
@@ -506,34 +528,48 @@ export default function ExpensesPage() {
             <p className="text-sm text-gray-400 py-8 text-center">Noch keine Ausgaben</p>
           ) : (
             <ul className="divide-y divide-gray-100">
-              {expenses.map((expense) => (
-                <li key={expense.id} className="flex items-center gap-3 px-6 py-3">
-                  <Avatar className="h-8 w-8 shrink-0">
-                    {expense.paidByUser.avatarUrl && (
-                      <AvatarImage src={expense.paidByUser.avatarUrl} alt={expense.paidByUser.name} />
-                    )}
-                    <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700">
-                      {getInitials(expense.paidByUser.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-400">{expense.paidByUser.name}</span>
-                      <Separator orientation="vertical" className="h-3" />
-                      <span className="text-xs text-gray-400">{formatDate(expense.date)}</span>
+              {expenses.map((expense) => {
+                const canDelete = expense.paidBy === session?.user?.id
+                const isDeleting = deletingId === expense.id
+                return (
+                  <li key={expense.id} className="flex items-center gap-3 px-6 py-3 group">
+                    <Avatar className="h-8 w-8 shrink-0">
+                      {expense.paidByUser.avatarUrl && (
+                        <AvatarImage src={expense.paidByUser.avatarUrl} alt={expense.paidByUser.name} />
+                      )}
+                      <AvatarFallback className="text-xs bg-indigo-100 text-indigo-700">
+                        {getInitials(expense.paidByUser.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs text-gray-400">{expense.paidByUser.name}</span>
+                        <Separator orientation="vertical" className="h-3" />
+                        <span className="text-xs text-gray-400">{formatDate(expense.date)}</span>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Badge className={CATEGORY_COLORS[expense.category]} variant="outline">
-                      {CATEGORY_LABELS[expense.category]}
-                    </Badge>
-                    <span className="font-semibold text-sm text-gray-900">
-                      {formatCurrency(expense.amount)}
-                    </span>
-                  </div>
-                </li>
-              ))}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge className={CATEGORY_COLORS[expense.category]} variant="outline">
+                        {CATEGORY_LABELS[expense.category]}
+                      </Badge>
+                      <span className="font-semibold text-sm text-gray-900">
+                        {formatCurrency(expense.amount)}
+                      </span>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(expense.id)}
+                          disabled={isDeleting}
+                          className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                          title="Ausgabe löschen"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </CardContent>
