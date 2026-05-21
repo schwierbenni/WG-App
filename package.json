@@ -32,6 +32,7 @@
     "@radix-ui/react-toast": "^1.2.15",
     "@tanstack/react-query": "^5.100.11",
     "@types/pg": "^8.20.0",
+    "@types/web-push": "^3.6.4",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -48,6 +49,7 @@
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0",
     "uuid": "^14.0.0",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
