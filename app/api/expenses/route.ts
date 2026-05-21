@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createExpenseSchema = z.object({
@@ -11,11 +11,13 @@ const createExpenseSchema = z.object({
 })
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   try {
     const expenses = await prisma.expense.findMany({
+      where: { wgId },
       include: { paidByUser: { select: { id: true, name: true, email: true, avatarUrl: true } } },
       orderBy: { date: 'desc' },
     })
@@ -27,8 +29,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     const body = await request.json()
@@ -42,13 +45,13 @@ export async function POST(request: Request) {
     const paidBy = session.user.id
     const splitWithFinal = splitWith.includes(paidBy) ? splitWith : [paidBy, ...splitWith]
 
-    const userCount = await prisma.user.count({ where: { id: { in: splitWithFinal } } })
+    const userCount = await prisma.user.count({ where: { id: { in: splitWithFinal }, wgId } })
     if (userCount !== splitWithFinal.length) {
-      return Response.json({ error: 'One or more users in splitWith not found' }, { status: 400 })
+      return Response.json({ error: 'One or more users not found in this WG' }, { status: 400 })
     }
 
     const expense = await prisma.expense.create({
-      data: { amount, description, category: category ?? 'SONSTIGES', paidBy, splitWith: splitWithFinal, date: date ? new Date(date) : new Date() },
+      data: { wgId, amount, description, category: category ?? 'SONSTIGES', paidBy, splitWith: splitWithFinal, date: date ? new Date(date) : new Date() },
       include: { paidByUser: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     })
 

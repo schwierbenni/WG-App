@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const patchSwapSchema = z.object({
@@ -10,14 +10,15 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { id } = await params
 
   try {
     const swapRequest = await prisma.swapRequest.findUnique({
-      where: { id },
+      where: { id, wgId },
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -43,8 +44,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { id } = await params
 
@@ -57,7 +59,7 @@ export async function PATCH(
     }
 
     const swapRequest = await prisma.swapRequest.findUnique({
-      where: { id },
+      where: { id, wgId },
       include: {
         assignment: { include: { duty: true } },
         fromUser: { select: { id: true, name: true } },
@@ -90,13 +92,13 @@ export async function PATCH(
 
       await prisma.notification.createMany({
         data: [
-          { userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: `${swapRequest.toUser.name} accepted your swap request for "${swapRequest.assignment.duty.name}".` },
-          { userId: swapRequest.toUserId, type: 'ASSIGNMENT', message: `You are now assigned to "${swapRequest.assignment.duty.name}" after accepting the swap.` },
+          { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" angenommen.` },
+          { wgId, userId: swapRequest.toUserId, type: 'ASSIGNMENT', message: `Du wurdest nach dem Tausch für "${swapRequest.assignment.duty.name}" eingeteilt.` },
         ],
       })
     } else {
       await prisma.notification.create({
-        data: { userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: `${swapRequest.toUser.name} rejected your swap request for "${swapRequest.assignment.duty.name}".` },
+        data: { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" abgelehnt.` },
       })
     }
 

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createAssignmentSchema = z.object({
@@ -9,8 +9,9 @@ const createAssignmentSchema = z.object({
 })
 
 export async function GET(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   const { searchParams } = new URL(request.url)
   const userId = searchParams.get('userId')
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
   const upcoming = searchParams.get('upcoming') === 'true'
 
   try {
-    const where: Record<string, unknown> = {}
+    const where: Record<string, unknown> = { wgId }
     if (userId) where.userId = userId
     if (dutyId) where.dutyId = dutyId
     if (upcoming) {
@@ -43,8 +44,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
+
   if (session.user.role !== 'ADMIN') {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
@@ -59,14 +62,14 @@ export async function POST(request: Request) {
 
     const { dutyId, userId, dueDate } = parsed.data
 
-    const duty = await prisma.duty.findUnique({ where: { id: dutyId } })
+    const duty = await prisma.duty.findUnique({ where: { id: dutyId, wgId } })
     if (!duty) return Response.json({ error: 'Duty not found' }, { status: 404 })
 
-    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const user = await prisma.user.findUnique({ where: { id: userId, wgId } })
     if (!user) return Response.json({ error: 'User not found' }, { status: 404 })
 
     const assignment = await prisma.dutyAssignment.create({
-      data: { dutyId, userId, dueDate: new Date(dueDate) },
+      data: { wgId, dutyId, userId, dueDate: new Date(dueDate) },
       include: {
         duty: { select: { id: true, name: true, emoji: true, color: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -75,6 +78,7 @@ export async function POST(request: Request) {
 
     await prisma.notification.create({
       data: {
+        wgId,
         userId,
         type: 'ASSIGNMENT',
         message: `You have been assigned to "${duty.name}". Due: ${new Date(dueDate).toLocaleDateString()}`,

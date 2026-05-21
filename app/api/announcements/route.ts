@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createAnnouncementSchema = z.object({
@@ -7,11 +7,13 @@ const createAnnouncementSchema = z.object({
 })
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   try {
     const announcements = await prisma.announcement.findMany({
+      where: { wgId },
       include: {
         author: {
           select: { id: true, name: true, email: true, avatarUrl: true },
@@ -39,8 +41,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     const body = await request.json()
@@ -51,23 +54,24 @@ export async function POST(request: Request) {
     }
 
     const announcement = await prisma.announcement.create({
-      data: { content: parsed.data.content, authorId: session.user.id },
+      data: { wgId, content: parsed.data.content, authorId: session.user.id },
       include: {
         author: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
     })
 
-    const allUsers = await prisma.user.findMany({
-      where: { id: { not: session.user.id } },
+    const wgMembers = await prisma.user.findMany({
+      where: { wgId, id: { not: session.user.id } },
       select: { id: true },
     })
 
-    if (allUsers.length > 0) {
+    if (wgMembers.length > 0) {
       await prisma.notification.createMany({
-        data: allUsers.map((user: { id: string }) => ({
+        data: wgMembers.map((user: { id: string }) => ({
+          wgId,
           userId: user.id,
           type: 'ANNOUNCEMENT' as const,
-          message: `New announcement: "${parsed.data.content.slice(0, 80)}${parsed.data.content.length > 80 ? '...' : ''}"`,
+          message: `Neue Ankündigung: "${parsed.data.content.slice(0, 80)}${parsed.data.content.length > 80 ? '...' : ''}"`,
         })),
       })
     }
