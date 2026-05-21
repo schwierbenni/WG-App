@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   Home, ClipboardList, Calendar, BarChart2, Megaphone,
   ShoppingCart, CreditCard, User, Settings, Users,
-  ChevronRight, Grid3X3, X,
+  ChevronRight, Grid3X3, X, ListMusic,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +25,7 @@ const mainNavItems: NavItem[] = [
   { href: '/announcements', label: 'Schwarzes Brett', icon: Megaphone },
   { href: '/shopping',      label: 'Einkaufsliste',   icon: ShoppingCart },
   { href: '/expenses',      label: 'Ausgaben',        icon: CreditCard },
+  { href: '/playlists',     label: 'Playlists',       icon: ListMusic },
   { href: '/profile',       label: 'Profil',          icon: User },
 ]
 
@@ -181,6 +182,7 @@ export function BottomNav({ userRole }: { userRole?: string }) {
     { href: '/calendar',   label: 'Kalender',    icon: Calendar },
     { href: '/statistics', label: 'Statistiken', icon: BarChart2 },
     { href: '/expenses',   label: 'Ausgaben',    icon: CreditCard },
+    { href: '/playlists',  label: 'Playlists',   icon: ListMusic },
     { href: '/profile',    label: 'Profil',      icon: User },
     ...(isAdmin
       ? [
