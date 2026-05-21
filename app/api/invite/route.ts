@@ -7,6 +7,28 @@ const validateSchema = z.object({
   token: z.string().min(1, 'Token ist erforderlich'),
 })
 
+function getAppBaseUrl(request: Request): string {
+  const env = process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL
+  if (env) {
+    const withProtocol = env.startsWith('http') ? env : `https://${env}`
+    return withProtocol.replace(/\/$/, '')
+  }
+  try {
+    return new URL(request.url).origin
+  } catch {
+    return 'https://localhost'
+  }
+}
+
+function getSearchParams(request: Request): URLSearchParams {
+  try {
+    return new URL(request.url).searchParams
+  } catch {
+    const idx = request.url.indexOf('?')
+    return new URLSearchParams(idx >= 0 ? request.url.slice(idx + 1) : '')
+  }
+}
+
 export async function GET(request: Request) {
   const auth = await requireWgSession()
   if (!auth.ok) return auth.response
@@ -16,7 +38,7 @@ export async function GET(request: Request) {
     return Response.json({ error: 'Nur Admins können Einladungslinks erstellen.' }, { status: 403 })
   }
 
-  const { searchParams } = new URL(request.url)
+  const searchParams = getSearchParams(request)
   const targetWgId = searchParams.get('wgId') ?? sessionWgId
 
   if (targetWgId !== sessionWgId) {
@@ -32,7 +54,7 @@ export async function GET(request: Request) {
       data: { wgId: targetWgId, createdBy: session.user.id, expiresAt },
     })
 
-    const baseUrl = (process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin).replace(/\/$/, '')
+    const baseUrl = getAppBaseUrl(request)
     const url = `${baseUrl}/register?token=${invite.token}`
 
     logger.info('Einladungslink erstellt', { by: session.user.id, token: invite.token, expiresAt, wgId: targetWgId })

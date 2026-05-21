@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
@@ -39,8 +40,10 @@ interface WgOption {
 export default function AdminMembersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [members, setMembers] = React.useState<Member[]>([])
+
   const [allWgs, setAllWgs] = React.useState<WgOption[]>([])
+  const [selectedWgId, setSelectedWgId] = React.useState<string>('')
+  const [members, setMembers] = React.useState<Member[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
 
@@ -61,18 +64,29 @@ export default function AdminMembersPage() {
     if (!session || session.user.role !== 'ADMIN') router.replace('/')
   }, [session, status, router])
 
-  const fetchData = React.useCallback(async () => {
+  // Load all WGs first, then set default selection
+  React.useEffect(() => {
+    if (session?.user?.role !== 'ADMIN') return
+    fetch('/api/admin/wgs')
+      .then((r) => r.json())
+      .then((data) => {
+        const wgs: WgOption[] = data.wgs ?? []
+        setAllWgs(wgs)
+        const currentWgId = (session.user as { wgId?: string }).wgId
+        setSelectedWgId(currentWgId ?? wgs[0]?.id ?? '')
+      })
+      .catch(() => {})
+  }, [session])
+
+  const fetchMembers = React.useCallback(async (wgId: string) => {
+    if (!wgId) return
     setLoading(true)
     setError('')
     try {
-      const [usersRes, wgsRes] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/admin/wgs'),
-      ])
-      if (!usersRes.ok) throw new Error('Fehler beim Laden der Mitglieder')
-      const [usersData, wgsData] = await Promise.all([usersRes.json(), wgsRes.json()])
-      setMembers(usersData.users ?? [])
-      setAllWgs(wgsData.wgs ?? [])
+      const res = await fetch(`/api/admin/users?wgId=${wgId}`)
+      if (!res.ok) throw new Error('Fehler beim Laden der Mitglieder')
+      const data = await res.json()
+      setMembers(data.users ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -81,8 +95,10 @@ export default function AdminMembersPage() {
   }, [])
 
   React.useEffect(() => {
-    if (session?.user?.role === 'ADMIN') fetchData()
-  }, [session, fetchData])
+    if (selectedWgId) fetchMembers(selectedWgId)
+  }, [selectedWgId, fetchMembers])
+
+  const selectedWg = allWgs.find((w) => w.id === selectedWgId)
 
   const handleRoleChange = async (member: Member) => {
     setRoleLoading(member.id)
@@ -111,9 +127,7 @@ export default function AdminMembersPage() {
         body: JSON.stringify({ wgId: newWgId }),
       })
       if (res.ok) {
-        // Member moved out of current WG — remove from list
         setMembers((prev) => prev.filter((m) => m.id !== member.id))
-        // Update member count in wgs list
         setAllWgs((prev) =>
           prev.map((w) => {
             if (w.id === member.wgId) return { ...w, _count: { members: w._count.members - 1 } }
@@ -135,6 +149,9 @@ export default function AdminMembersPage() {
       const res = await fetch(`/api/users/${removeTarget.id}`, { method: 'DELETE' })
       if (res.ok || res.status === 204) {
         setMembers((prev) => prev.filter((m) => m.id !== removeTarget.id))
+        setAllWgs((prev) =>
+          prev.map((w) => w.id === selectedWgId ? { ...w, _count: { members: w._count.members - 1 } } : w)
+        )
         setRemoveTarget(null)
         setRemoveConfirm('')
       } else {
@@ -150,8 +167,9 @@ export default function AdminMembersPage() {
 
   const handleGenerateInvite = async () => {
     setGeneratingLink(true)
+    setInviteLink('')
     try {
-      const res = await fetch('/api/invite')
+      const res = await fetch(`/api/invite?wgId=${selectedWgId}`)
       if (res.ok) {
         const data = await res.json()
         setInviteLink(data.url)
@@ -186,32 +204,57 @@ export default function AdminMembersPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mitglieder verwalten</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {members.length} {members.length === 1 ? 'Mitglied' : 'Mitglieder'} in deiner WG
+            {members.length} {members.length === 1 ? 'Mitglied' : 'Mitglieder'}
+            {selectedWg ? ` in „${selectedWg.name}"` : ''}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+        <Button variant="outline" size="sm" onClick={() => fetchMembers(selectedWgId)} disabled={loading}>
           <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
           <span className="hidden sm:inline">Aktualisieren</span>
         </Button>
       </div>
 
+      {/* WG selector */}
+      {allWgs.length > 1 && (
+        <div className="flex items-center gap-3">
+          <Label htmlFor="wg-select" className="text-sm font-medium text-gray-700 shrink-0">
+            WG anzeigen:
+          </Label>
+          <Select
+            id="wg-select"
+            value={selectedWgId}
+            onChange={(e) => {
+              setSelectedWgId(e.target.value)
+              setInviteLink('')
+            }}
+            className="max-w-xs"
+          >
+            {allWgs.map((wg) => (
+              <option key={wg.id} value={wg.id}>
+                {wg.name}{wg.id === currentWgId ? ' (deine WG)' : ''} — {wg._count.members} Mitglieder
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       )}
 
+      {/* Invite card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <LinkIcon className="h-5 w-5 text-indigo-500" />
-            Neues Mitglied einladen
+            Mitglied einladen{selectedWg ? ` – ${selectedWg.name}` : ''}
           </CardTitle>
           <CardDescription>
             Link ist 7 Tage lang gültig und kann einmal verwendet werden.
-            Für andere WGs: <a href="/admin/wg" className="text-indigo-600 hover:underline">WG-Verwaltung</a>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button variant="outline" onClick={handleGenerateInvite} disabled={generatingLink}>
+          <Button variant="outline" onClick={handleGenerateInvite} disabled={generatingLink || !selectedWgId}>
             <LinkIcon className="h-4 w-4" />
             {generatingLink ? 'Generiere…' : 'Einladungslink generieren'}
           </Button>
@@ -234,11 +277,12 @@ export default function AdminMembersPage() {
         </CardContent>
       </Card>
 
+      {/* Members list */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Users className="h-5 w-5 text-indigo-500" />
-            WG-Mitglieder
+            Mitglieder
           </CardTitle>
           {allWgs.length > 1 && (
             <CardDescription className="flex items-center gap-1">
@@ -262,7 +306,9 @@ export default function AdminMembersPage() {
               ))}
             </div>
           ) : members.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center px-6">Keine Mitglieder gefunden</p>
+            <p className="text-sm text-gray-400 py-8 text-center px-6">
+              Keine Mitglieder in dieser WG
+            </p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {members.map((member) => {
@@ -303,7 +349,7 @@ export default function AdminMembersPage() {
                           >
                             {allWgs.map((wg) => (
                               <option key={wg.id} value={wg.id}>
-                                {wg.name}{wg.id === currentWgId ? ' (diese WG)' : ''}
+                                {wg.name}
                               </option>
                             ))}
                           </Select>
@@ -344,7 +390,7 @@ export default function AdminMembersPage() {
                             size="sm"
                             className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                             onClick={() => { setRemoveTarget(member); setRemoveConfirm(''); setRemoveError('') }}
-                            title="Aus WG entfernen"
+                            title="Konto löschen"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Entfernen</span>
