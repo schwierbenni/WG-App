@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       data: { wgId: targetWgId, createdBy: session.user.id, expiresAt },
     })
 
-    const baseUrl = new URL(request.url).origin
+    const baseUrl = (process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? new URL(request.url).origin).replace(/\/$/, '')
     const url = `${baseUrl}/register?token=${invite.token}`
 
     logger.info('Einladungslink erstellt', { by: session.user.id, token: invite.token, expiresAt, wgId: targetWgId })
