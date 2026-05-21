@@ -12,15 +12,16 @@ model WGConfig {
   inviteCode String   @unique @default(cuid())
   createdAt  DateTime @default(now())
 
-  members       User[]
-  duties        Duty[]
-  assignments   DutyAssignment[]
-  swapRequests  SwapRequest[]
-  announcements Announcement[]
-  shoppingItems ShoppingItem[]
-  expenses      Expense[]
-  notifications Notification[]
-  inviteTokens  InviteToken[]
+  members          User[]
+  duties           Duty[]
+  assignments      DutyAssignment[]
+  swapRequests     SwapRequest[]
+  announcements    Announcement[]
+  shoppingItems    ShoppingItem[]
+  expenses         Expense[]
+  notifications    Notification[]
+  inviteTokens     InviteToken[]
+  spotifyPlaylists SpotifyPlaylist[]
 }
 
 model User {
@@ -45,6 +46,7 @@ model User {
   expenses           Expense[]
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
+  spotifyPlaylists   SpotifyPlaylist[]
 }
 
 enum Role {
@@ -233,4 +235,17 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SpotifyPlaylist {
+  id          String   @id @default(cuid())
+  userId      String
+  wgId        String
+  title       String
+  description String?
+  spotifyUrl  String
+  createdAt   DateTime @default(now())
+
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wg   WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
 }
