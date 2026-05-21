@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createDutySchema = z.object({
@@ -13,12 +13,13 @@ const createDutySchema = z.object({
 })
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   try {
     const duties = await prisma.duty.findMany({
-      where: { isActive: true },
+      where: { wgId, isActive: true },
       include: {
         assignments: {
           where: { completedAt: null },
@@ -40,8 +41,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
+
   if (session.user.role !== 'ADMIN') return Response.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
@@ -54,6 +57,7 @@ export async function POST(request: Request) {
 
     const duty = await prisma.duty.create({
       data: {
+        wgId,
         name: parsed.data.name,
         description: parsed.data.description,
         emoji: parsed.data.emoji,

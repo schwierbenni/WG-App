@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from 'next-auth'
+import { prisma } from '@/lib/db'
 
 export const authConfig: NextAuthConfig = {
   session: { strategy: 'jwt' },
@@ -8,15 +9,29 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.id = user.id
         token.role = (user as { role?: string }).role
+        token.wgId = (user as { wgId?: string }).wgId
+      } else if (token.id && !token.wgId) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { wgId: true, role: true },
+        })
+        if (dbUser) {
+          token.wgId = dbUser.wgId
+          token.role = dbUser.role
+        }
       }
       return token
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
+      return {
+        ...session,
+        user: {
+          ...session.user,
+          id: (token.id ?? '') as string,
+          role: (token.role ?? '') as string,
+          wgId: (token.wgId ?? '') as string,
+        },
       }
-      return session
     },
   },
   pages: {

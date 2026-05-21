@@ -6,8 +6,26 @@ datasource db {
   provider = "postgresql"
 }
 
+model WGConfig {
+  id         String   @id @default(cuid())
+  name       String
+  inviteCode String   @unique @default(cuid())
+  createdAt  DateTime @default(now())
+
+  members       User[]
+  duties        Duty[]
+  assignments   DutyAssignment[]
+  swapRequests  SwapRequest[]
+  announcements Announcement[]
+  shoppingItems ShoppingItem[]
+  expenses      Expense[]
+  notifications Notification[]
+  inviteTokens  InviteToken[]
+}
+
 model User {
   id                 String    @id @default(cuid())
+  wgId               String
   name               String
   email              String    @unique
   passwordHash       String
@@ -17,9 +35,10 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  wg               WGConfig               @relation(fields: [wgId], references: [id], onDelete: Cascade)
   assignments      DutyAssignment[]
-  swapRequestsFrom SwapRequest[]         @relation("SwapFrom")
-  swapRequestsTo   SwapRequest[]         @relation("SwapTo")
+  swapRequestsFrom SwapRequest[]          @relation("SwapFrom")
+  swapRequestsTo   SwapRequest[]          @relation("SwapTo")
   announcements    Announcement[]
   reactions        AnnouncementReaction[]
   shoppingItems    ShoppingItem[]
@@ -32,15 +51,9 @@ enum Role {
   MEMBER
 }
 
-model WGConfig {
-  id         String   @id @default(cuid())
-  name       String
-  inviteCode String   @unique @default(cuid())
-  createdAt  DateTime @default(now())
-}
-
 model Duty {
   id               String           @id @default(cuid())
+  wgId             String
   name             String
   description      String?
   emoji            String?
@@ -53,6 +66,7 @@ model Duty {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
+  wg          WGConfig         @relation(fields: [wgId], references: [id], onDelete: Cascade)
   assignments DutyAssignment[]
 }
 
@@ -66,6 +80,7 @@ enum RotationInterval {
 
 model DutyAssignment {
   id          String    @id @default(cuid())
+  wgId        String
   dutyId      String
   userId      String
   dueDate     DateTime
@@ -73,6 +88,7 @@ model DutyAssignment {
   completedBy String?
   createdAt   DateTime  @default(now())
 
+  wg           WGConfig      @relation(fields: [wgId], references: [id], onDelete: Cascade)
   duty         Duty          @relation(fields: [dutyId], references: [id], onDelete: Cascade)
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   swapRequests SwapRequest[]
@@ -80,6 +96,7 @@ model DutyAssignment {
 
 model SwapRequest {
   id           String     @id @default(cuid())
+  wgId         String
   fromUserId   String
   toUserId     String
   assignmentId String
@@ -87,6 +104,7 @@ model SwapRequest {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
+  wg         WGConfig       @relation(fields: [wgId], references: [id], onDelete: Cascade)
   fromUser   User           @relation("SwapFrom", fields: [fromUserId], references: [id])
   toUser     User           @relation("SwapTo", fields: [toUserId], references: [id])
   assignment DutyAssignment @relation(fields: [assignmentId], references: [id])
@@ -100,10 +118,12 @@ enum SwapStatus {
 
 model Announcement {
   id        String   @id @default(cuid())
+  wgId      String
   authorId  String
   content   String
   createdAt DateTime @default(now())
 
+  wg        WGConfig               @relation(fields: [wgId], references: [id], onDelete: Cascade)
   author    User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
   reactions AnnouncementReaction[]
 }
@@ -122,6 +142,7 @@ model AnnouncementReaction {
 
 model ShoppingItem {
   id        String           @id @default(cuid())
+  wgId      String
   name      String
   category  ShoppingCategory @default(LEBENSMITTEL)
   note      String?
@@ -129,7 +150,8 @@ model ShoppingItem {
   boughtAt  DateTime?
   createdAt DateTime         @default(now())
 
-  user User @relation(fields: [addedBy], references: [id])
+  wg   WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [addedBy], references: [id])
 }
 
 enum ShoppingCategory {
@@ -140,6 +162,7 @@ enum ShoppingCategory {
 
 model Expense {
   id          String          @id @default(cuid())
+  wgId        String
   amount      Float
   description String
   category    ExpenseCategory @default(SONSTIGES)
@@ -149,7 +172,8 @@ model Expense {
   settledAt   DateTime?
   createdAt   DateTime        @default(now())
 
-  paidByUser User @relation(fields: [paidBy], references: [id])
+  wg         WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  paidByUser User     @relation(fields: [paidBy], references: [id])
 }
 
 enum ExpenseCategory {
@@ -161,13 +185,15 @@ enum ExpenseCategory {
 
 model Notification {
   id        String           @id @default(cuid())
+  wgId      String
   userId    String
   type      NotificationType
   message   String
   readAt    DateTime?
   createdAt DateTime         @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  wg   WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum NotificationType {
@@ -187,9 +213,12 @@ model PasswordResetToken {
 
 model InviteToken {
   id        String    @id @default(cuid())
+  wgId      String
   token     String    @unique @default(cuid())
   createdBy String
   expiresAt DateTime
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+
+  wg WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
 }

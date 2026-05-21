@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const reactionSchema = z.object({
@@ -10,8 +10,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { id: announcementId } = await params
 
@@ -26,7 +27,7 @@ export async function POST(
     const { emoji } = parsed.data
     const userId = session.user.id
 
-    const announcement = await prisma.announcement.findUnique({ where: { id: announcementId } })
+    const announcement = await prisma.announcement.findUnique({ where: { id: announcementId, wgId } })
     if (!announcement) {
       return Response.json({ error: 'Announcement not found' }, { status: 404 })
     }

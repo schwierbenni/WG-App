@@ -35,6 +35,7 @@ async function main() {
       where: { email: member.email },
       update: {},
       create: {
+        wgId: wgConfig.id,
         name: member.name,
         email: member.email,
         passwordHash,
@@ -91,7 +92,7 @@ async function main() {
 
     if (!existing) {
       const created = await prisma.duty.create({
-        data: { ...duty, rotationOrder: userIds },
+        data: { ...duty, wgId: wgConfig.id, rotationOrder: userIds },
       })
       createdDuties.push({ id: created.id, name: created.name })
       console.log(`✅ Dienst erstellt: ${created.name}`)
@@ -116,7 +117,7 @@ async function main() {
       where: { dutyId: duty.id, dueDate: { gte: startOfWeek, lte: endOfWeek } },
     })
     if (!existing) {
-      await prisma.dutyAssignment.create({ data: { dutyId: duty.id, userId, dueDate: endOfWeek } })
+      await prisma.dutyAssignment.create({ data: { wgId: wgConfig.id, dutyId: duty.id, userId, dueDate: endOfWeek } })
       const user = createdUsers.find((u) => u.id === userId)
       console.log(`✅ Zuweisung: ${duty.name} → ${user?.name}`)
     }
@@ -127,6 +128,7 @@ async function main() {
   if (!existingAnnouncement) {
     await prisma.announcement.create({
       data: {
+        wgId: wgConfig.id,
         authorId: adminUser.id,
         content: 'Willkommen bei FlatMate! 🎉 Hier können wir unsere WG-Dienste organisieren. Bitte schaut euch die Dienste an und erledigt sie pünktlich!',
       },
@@ -138,10 +140,10 @@ async function main() {
   if (!existingShopping) {
     await prisma.shoppingItem.createMany({
       data: [
-        { name: 'Spülmittel', category: 'HAUSHALT', addedBy: userIds[1] },
-        { name: 'Toilettenpapier', category: 'HAUSHALT', addedBy: userIds[2], note: 'Bitte 3-lagig' },
-        { name: 'Milch', category: 'LEBENSMITTEL', addedBy: userIds[3] },
-        { name: 'Brot', category: 'LEBENSMITTEL', addedBy: userIds[4] },
+        { wgId: wgConfig.id, name: 'Spülmittel', category: 'HAUSHALT', addedBy: userIds[1] },
+        { wgId: wgConfig.id, name: 'Toilettenpapier', category: 'HAUSHALT', addedBy: userIds[2], note: 'Bitte 3-lagig' },
+        { wgId: wgConfig.id, name: 'Milch', category: 'LEBENSMITTEL', addedBy: userIds[3] },
+        { wgId: wgConfig.id, name: 'Brot', category: 'LEBENSMITTEL', addedBy: userIds[4] },
       ],
     })
     console.log('✅ Einkaufsartikel erstellt')

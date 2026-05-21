@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createItemSchema = z.object({
@@ -9,11 +9,13 @@ const createItemSchema = z.object({
 })
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   try {
     const items = await prisma.shoppingItem.findMany({
+      where: { wgId },
       include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
       orderBy: [{ boughtAt: 'asc' }, { createdAt: 'asc' }],
     })
@@ -31,8 +33,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     const body = await request.json()
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     const item = await prisma.shoppingItem.create({
-      data: { name: parsed.data.name, category: parsed.data.category ?? 'LEBENSMITTEL', note: parsed.data.note, addedBy: session.user.id },
+      data: { wgId, name: parsed.data.name, category: parsed.data.category ?? 'LEBENSMITTEL', note: parsed.data.note, addedBy: session.user.id },
       include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     })
 

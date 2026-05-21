@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createSwapSchema = z.object({
@@ -8,21 +8,22 @@ const createSwapSchema = z.object({
 })
 
 export async function GET(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   const { searchParams } = new URL(request.url)
   const direction = searchParams.get('direction')
 
   try {
     const userId = session.user.id
-    let where: Record<string, unknown> = {}
-    if (direction === 'sent') where = { fromUserId: userId }
-    else if (direction === 'received') where = { toUserId: userId }
-    else where = { OR: [{ fromUserId: userId }, { toUserId: userId }] }
+    let userFilter: Record<string, unknown> = {}
+    if (direction === 'sent') userFilter = { fromUserId: userId }
+    else if (direction === 'received') userFilter = { toUserId: userId }
+    else userFilter = { OR: [{ fromUserId: userId }, { toUserId: userId }] }
 
     const swapRequests = await prisma.swapRequest.findMany({
-      where,
+      where: { wgId, ...userFilter },
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -39,8 +40,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { session, wgId } = auth
 
   try {
     const body = await request.json()
@@ -55,18 +57,18 @@ export async function POST(request: Request) {
 
     if (fromUserId === toUserId) return Response.json({ error: 'Cannot swap with yourself' }, { status: 400 })
 
-    const assignment = await prisma.dutyAssignment.findUnique({ where: { id: assignmentId }, include: { duty: true } })
+    const assignment = await prisma.dutyAssignment.findUnique({ where: { id: assignmentId, wgId }, include: { duty: true } })
     if (!assignment) return Response.json({ error: 'Assignment not found' }, { status: 404 })
     if (assignment.userId !== fromUserId) return Response.json({ error: 'This assignment does not belong to you' }, { status: 403 })
 
-    const toUser = await prisma.user.findUnique({ where: { id: toUserId } })
-    if (!toUser) return Response.json({ error: 'Target user not found' }, { status: 404 })
+    const toUser = await prisma.user.findUnique({ where: { id: toUserId, wgId } })
+    if (!toUser) return Response.json({ error: 'Target user not found in this WG' }, { status: 404 })
 
-    const existingPending = await prisma.swapRequest.findFirst({ where: { assignmentId, status: 'PENDING' } })
+    const existingPending = await prisma.swapRequest.findFirst({ where: { assignmentId, status: 'PENDING', wgId } })
     if (existingPending) return Response.json({ error: 'A pending swap request already exists for this assignment' }, { status: 409 })
 
     const swapRequest = await prisma.swapRequest.create({
-      data: { fromUserId, toUserId, assignmentId, status: 'PENDING' },
+      data: { wgId, fromUserId, toUserId, assignmentId, status: 'PENDING' },
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -78,9 +80,10 @@ export async function POST(request: Request) {
 
     await prisma.notification.create({
       data: {
+        wgId,
         userId: toUserId,
         type: 'SWAP_REQUEST',
-        message: `${fromUser?.name ?? 'Someone'} wants to swap their "${assignment.duty.name}" assignment with you.`,
+        message: `${fromUser?.name ?? 'Jemand'} möchte den Dienst "${assignment.duty.name}" mit dir tauschen.`,
       },
     })
 
