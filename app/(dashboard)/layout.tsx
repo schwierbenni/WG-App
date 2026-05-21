@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { Sidebar, BottomNav } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
+import { PushNotificationPrompt } from '@/components/push-notification-prompt'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -47,6 +48,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
       {/* Mobile bottom navigation */}
       <BottomNav userRole={role} />
+
+      {/* Push notification permission prompt */}
+      <PushNotificationPrompt />
     </div>
   )
 }

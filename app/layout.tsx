@@ -23,11 +23,20 @@ export const metadata: Metadata = {
   keywords: ['WG', 'Wohngemeinschaft', 'Verwaltung', 'Dienste', 'Haushalt'],
   authors: [{ name: 'FlatMate' }],
   robots: 'noindex, nofollow',
+  appleWebApp: {
+    capable: true,
+    title: 'FlatMate',
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  minimumScale: 1,
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f7f4ef' },
