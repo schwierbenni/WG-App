@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth'
+import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 interface Settlement {
@@ -10,12 +10,13 @@ interface Settlement {
 }
 
 export async function GET() {
-  const session = await auth()
-  if (!session) return new Response('Unauthorized', { status: 401 })
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
 
   try {
     const expenses = await prisma.expense.findMany({
-      where: { settledAt: null },
+      where: { wgId, settledAt: null },
       include: { paidByUser: { select: { id: true, name: true } } },
     })
 
@@ -26,10 +27,10 @@ export async function GET() {
     }
 
     const users = await prisma.user.findMany({
-      where: { id: { in: Array.from(allUserIds) } },
+      where: { id: { in: Array.from(allUserIds) }, wgId },
       select: { id: true, name: true },
     })
-    const userMap = new Map<string, string>(users.map((u: { id: string; name: string }) => [u.id, u.name] as [string, string]))
+    const userMap = new Map<string, string>(users.map((u) => [u.id, u.name] as [string, string]))
 
     const net: Record<string, Record<string, number>> = {}
 
@@ -69,6 +70,37 @@ export async function GET() {
     return Response.json({ settlements })
   } catch (error) {
     console.error('GET settlements error:', error)
+    return Response.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function POST(req: Request) {
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
+
+  try {
+    const { fromUserId, toUserId } = await req.json()
+    if (!fromUserId || !toUserId) {
+      return Response.json({ error: 'fromUserId und toUserId erforderlich' }, { status: 400 })
+    }
+
+    // Mark all unsettled expenses between these two users as settled
+    await prisma.expense.updateMany({
+      where: {
+        wgId,
+        settledAt: null,
+        OR: [
+          { paidBy: toUserId, splitWith: { has: fromUserId } },
+          { paidBy: fromUserId, splitWith: { has: toUserId } },
+        ],
+      },
+      data: { settledAt: new Date() },
+    })
+
+    return Response.json({ ok: true })
+  } catch (error) {
+    console.error('POST settlements error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
