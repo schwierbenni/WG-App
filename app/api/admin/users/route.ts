@@ -1,4 +1,4 @@
-import { requireWgSession } from '@/lib/api-auth'
+import { requireWgSession, isSuperAdmin } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 function getSearchParams(request: Request): URLSearchParams {
@@ -13,14 +13,17 @@ function getSearchParams(request: Request): URLSearchParams {
 export async function GET(request: Request) {
   const auth = await requireWgSession()
   if (!auth.ok) return auth.response
-  const { session } = auth
+  const { session, wgId: sessionWgId } = auth
 
   if (session.user.role !== 'ADMIN') {
     return Response.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Regular admins always see only their own WG – ignore any wgId param
+  const superAdmin = isSuperAdmin(session.user.email)
   const searchParams = getSearchParams(request)
-  const wgId = searchParams.get('wgId')
+  const requestedWgId = searchParams.get('wgId')
+  const wgId = superAdmin ? (requestedWgId ?? undefined) : sessionWgId
 
   try {
     const users = await prisma.user.findMany({

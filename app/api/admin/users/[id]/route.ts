@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { requireWgSession } from '@/lib/api-auth'
+import { requireSuperAdminSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const moveUserSchema = z.object({
@@ -10,13 +10,9 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireWgSession()
+  const auth = await requireSuperAdminSession()
   if (!auth.ok) return auth.response
   const { session } = auth
-
-  if (session.user.role !== 'ADMIN') {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
 
   const { id } = await params
 

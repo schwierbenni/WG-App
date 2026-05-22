@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { requireWgSession } from '@/lib/api-auth'
+import { requireWgSession, isSuperAdmin } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
@@ -39,7 +39,11 @@ export async function GET(request: Request) {
   }
 
   const searchParams = getSearchParams(request)
-  const targetWgId = searchParams.get('wgId') ?? sessionWgId
+  const superAdmin = isSuperAdmin(session.user.email)
+
+  // Regular admins can only invite to their own WG; ignore any ?wgId= param
+  const requestedWgId = searchParams.get('wgId')
+  const targetWgId = superAdmin ? (requestedWgId ?? sessionWgId) : sessionWgId
 
   if (targetWgId !== sessionWgId) {
     const targetWg = await prisma.wGConfig.findUnique({ where: { id: targetWgId }, select: { id: true } })

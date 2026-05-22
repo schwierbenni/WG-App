@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { requireWgSession } from '@/lib/api-auth'
+import { requireSuperAdminSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const createWgSchema = z.object({
@@ -7,13 +7,8 @@ const createWgSchema = z.object({
 })
 
 export async function GET() {
-  const auth = await requireWgSession()
+  const auth = await requireSuperAdminSession()
   if (!auth.ok) return auth.response
-  const { session } = auth
-
-  if (session.user.role !== 'ADMIN') {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
 
   try {
     const wgs = await prisma.wGConfig.findMany({
@@ -33,13 +28,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireWgSession()
+  const auth = await requireSuperAdminSession()
   if (!auth.ok) return auth.response
-  const { session } = auth
-
-  if (session.user.role !== 'ADMIN') {
-    return Response.json({ error: 'Forbidden' }, { status: 403 })
-  }
 
   try {
     const body = await request.json()

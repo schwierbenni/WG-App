@@ -20,6 +20,8 @@ import {
 } from '@/components/ui/dialog'
 import { cn, getInitials, formatDate } from '@/lib/utils'
 
+const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL ?? 'schwier.b@gmail.com'
+
 interface Member {
   id: string
   name: string
@@ -64,24 +66,31 @@ export default function AdminMembersPage() {
     if (!session || session.user.role !== 'ADMIN') router.replace('/')
   }, [session, status, router])
 
-  // Load all WGs first, then set default selection
+  const currentWgId = (session?.user as { wgId?: string })?.wgId ?? ''
+  const superAdmin = !!session?.user?.email && session.user.email === SUPER_ADMIN_EMAIL
+
+  // Super admin: load all WGs for the selector
   React.useEffect(() => {
-    if (session?.user?.role !== 'ADMIN') return
+    if (!superAdmin || session?.user?.role !== 'ADMIN') return
     fetch('/api/admin/wgs')
       .then((r) => r.json())
       .then((data) => {
         const wgs: WgOption[] = data.wgs ?? []
         setAllWgs(wgs)
-        const currentWgId = (session.user as { wgId?: string }).wgId
         setSelectedWgId(currentWgId ?? wgs[0]?.id ?? '')
       })
       .catch(() => {})
-  }, [session])
+  }, [superAdmin, session, currentWgId])
+
+  // Regular admin: fixed to own WG
+  React.useEffect(() => {
+    if (superAdmin || !currentWgId) return
+    setSelectedWgId(currentWgId)
+  }, [superAdmin, currentWgId])
 
   const fetchMembers = React.useCallback(async (wgId: string) => {
     if (!wgId) return
-    setLoading(true)
-    setError('')
+    setLoading(true); setError('')
     try {
       const res = await fetch(`/api/admin/users?wgId=${wgId}`)
       if (!res.ok) throw new Error('Fehler beim Laden der Mitglieder')
@@ -89,16 +98,14 @@ export default function AdminMembersPage() {
       setMembers(data.users ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }, [])
 
   React.useEffect(() => {
     if (selectedWgId) fetchMembers(selectedWgId)
   }, [selectedWgId, fetchMembers])
 
-  const selectedWg = allWgs.find((w) => w.id === selectedWgId)
+  const selectedWg = superAdmin ? allWgs.find((w) => w.id === selectedWgId) : null
 
   const handleRoleChange = async (member: Member) => {
     setRoleLoading(member.id)
@@ -109,12 +116,8 @@ export default function AdminMembersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole }),
       })
-      if (res.ok) {
-        setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, role: newRole } : m)))
-      }
-    } catch { /* ignore */ } finally {
-      setRoleLoading(null)
-    }
+      if (res.ok) setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, role: newRole } : m)))
+    } catch { /* ignore */ } finally { setRoleLoading(null) }
   }
 
   const handleWgChange = async (member: Member, newWgId: string) => {
@@ -136,56 +139,46 @@ export default function AdminMembersPage() {
           })
         )
       }
-    } catch { /* ignore */ } finally {
-      setWgLoading(null)
-    }
+    } catch { /* ignore */ } finally { setWgLoading(null) }
   }
 
   const handleRemove = async () => {
     if (!removeTarget || removeConfirm !== removeTarget.name) return
-    setRemoving(true)
-    setRemoveError('')
+    setRemoving(true); setRemoveError('')
     try {
       const res = await fetch(`/api/users/${removeTarget.id}`, { method: 'DELETE' })
       if (res.ok || res.status === 204) {
         setMembers((prev) => prev.filter((m) => m.id !== removeTarget.id))
-        setAllWgs((prev) =>
-          prev.map((w) => w.id === selectedWgId ? { ...w, _count: { members: w._count.members - 1 } } : w)
-        )
-        setRemoveTarget(null)
-        setRemoveConfirm('')
+        if (superAdmin) {
+          setAllWgs((prev) =>
+            prev.map((w) => w.id === selectedWgId ? { ...w, _count: { members: w._count.members - 1 } } : w)
+          )
+        }
+        setRemoveTarget(null); setRemoveConfirm('')
       } else {
         const data = await res.json()
         setRemoveError(data.error ?? 'Fehler beim Entfernen')
       }
     } catch {
       setRemoveError('Netzwerkfehler. Bitte erneut versuchen.')
-    } finally {
-      setRemoving(false)
-    }
+    } finally { setRemoving(false) }
   }
 
   const handleGenerateInvite = async () => {
-    setGeneratingLink(true)
-    setInviteLink('')
+    setGeneratingLink(true); setInviteLink('')
     try {
-      const res = await fetch(`/api/invite?wgId=${selectedWgId}`)
-      if (res.ok) {
-        const data = await res.json()
-        setInviteLink(data.url)
-      }
-    } catch { /* ignore */ } finally {
-      setGeneratingLink(false)
-    }
+      // Regular admins: /api/invite with no wgId (enforced server-side to own WG)
+      // Super admin: pass the selected wgId
+      const url = superAdmin ? `/api/invite?wgId=${selectedWgId}` : '/api/invite'
+      const res = await fetch(url)
+      if (res.ok) { const data = await res.json(); setInviteLink(data.url) }
+    } catch { /* ignore */ } finally { setGeneratingLink(false) }
   }
 
   const handleCopy = async () => {
     if (!inviteLink) return
-    try {
-      await navigator.clipboard.writeText(inviteLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch { /* ignore */ }
+    try { await navigator.clipboard.writeText(inviteLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+    catch { /* ignore */ }
   }
 
   if (status === 'loading') {
@@ -196,7 +189,7 @@ export default function AdminMembersPage() {
     )
   }
 
-  const currentWgId = (session?.user as { wgId?: string })?.wgId
+  const wgLabel = selectedWg ? ` – ${selectedWg.name}` : ''
 
   return (
     <div className="space-y-6">
@@ -205,7 +198,7 @@ export default function AdminMembersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Mitglieder verwalten</h1>
           <p className="text-sm text-gray-500 mt-1">
             {members.length} {members.length === 1 ? 'Mitglied' : 'Mitglieder'}
-            {selectedWg ? ` in „${selectedWg.name}"` : ''}
+            {superAdmin && selectedWg ? ` in „${selectedWg.name}"` : ''}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => fetchMembers(selectedWgId)} disabled={loading}>
@@ -214,19 +207,14 @@ export default function AdminMembersPage() {
         </Button>
       </div>
 
-      {/* WG selector */}
-      {allWgs.length > 1 && (
+      {/* WG selector – Super Admin only */}
+      {superAdmin && allWgs.length > 1 && (
         <div className="flex items-center gap-3">
-          <Label htmlFor="wg-select" className="text-sm font-medium text-gray-700 shrink-0">
-            WG anzeigen:
-          </Label>
+          <Label htmlFor="wg-select" className="text-sm font-medium text-gray-700 shrink-0">WG anzeigen:</Label>
           <Select
             id="wg-select"
             value={selectedWgId}
-            onChange={(e) => {
-              setSelectedWgId(e.target.value)
-              setInviteLink('')
-            }}
+            onChange={(e) => { setSelectedWgId(e.target.value); setInviteLink('') }}
             className="max-w-xs"
           >
             {allWgs.map((wg) => (
@@ -247,11 +235,9 @@ export default function AdminMembersPage() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <LinkIcon className="h-5 w-5 text-indigo-500" />
-            Mitglied einladen{selectedWg ? ` – ${selectedWg.name}` : ''}
+            Mitglied einladen{wgLabel}
           </CardTitle>
-          <CardDescription>
-            Link ist 7 Tage lang gültig und kann einmal verwendet werden.
-          </CardDescription>
+          <CardDescription>Link ist 7 Tage lang gültig und kann einmal verwendet werden.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <Button variant="outline" onClick={handleGenerateInvite} disabled={generatingLink || !selectedWgId}>
@@ -261,13 +247,9 @@ export default function AdminMembersPage() {
           {inviteLink && (
             <div className="space-y-1.5">
               <div className="flex gap-2">
-                <Input
-                  value={inviteLink}
-                  readOnly
-                  className="text-xs font-mono text-gray-600"
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                />
-                <Button variant="outline" size="icon" onClick={handleCopy} title="Link kopieren">
+                <Input value={inviteLink} readOnly className="text-xs font-mono text-gray-600"
+                  onClick={(e) => (e.target as HTMLInputElement).select()} />
+                <Button variant="outline" size="icon" onClick={handleCopy}>
                   {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
@@ -284,10 +266,10 @@ export default function AdminMembersPage() {
             <Users className="h-5 w-5 text-indigo-500" />
             Mitglieder
           </CardTitle>
-          {allWgs.length > 1 && (
+          {superAdmin && allWgs.length > 1 && (
             <CardDescription className="flex items-center gap-1">
               <ArrowRightLeft className="h-3.5 w-3.5" />
-              Per Dropdown kannst du Mitglieder in eine andere WG verschieben. Sie müssen sich danach neu anmelden.
+              Per Dropdown kannst du Mitglieder in eine andere WG verschieben.
             </CardDescription>
           )}
         </CardHeader>
@@ -298,17 +280,14 @@ export default function AdminMembersPage() {
                 <div key={i} className="flex items-center gap-3">
                   <Skeleton className="h-10 w-10 rounded-full" />
                   <div className="flex-1 space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-48" />
+                    <Skeleton className="h-4 w-32" /><Skeleton className="h-3 w-48" />
                   </div>
                   <Skeleton className="h-8 w-28" />
                 </div>
               ))}
             </div>
           ) : members.length === 0 ? (
-            <p className="text-sm text-gray-400 py-8 text-center px-6">
-              Keine Mitglieder in dieser WG
-            </p>
+            <p className="text-sm text-gray-400 py-8 text-center px-6">Keine Mitglieder in dieser WG</p>
           ) : (
             <ul className="divide-y divide-gray-100">
               {members.map((member) => {
@@ -317,9 +296,7 @@ export default function AdminMembersPage() {
                   <li key={member.id} className="flex items-center gap-3 px-4 py-4 sm:px-6">
                     <Avatar className="h-10 w-10 shrink-0">
                       {member.avatarUrl && <AvatarImage src={member.avatarUrl} alt={member.name} />}
-                      <AvatarFallback className="bg-indigo-100 text-indigo-700">
-                        {getInitials(member.name)}
-                      </AvatarFallback>
+                      <AvatarFallback className="bg-indigo-100 text-indigo-700">{getInitials(member.name)}</AvatarFallback>
                     </Avatar>
 
                     <div className="flex-1 min-w-0">
@@ -337,20 +314,17 @@ export default function AdminMembersPage() {
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      {/* WG assignment dropdown */}
-                      {allWgs.length > 1 && !isSelf && (
+                      {/* WG move dropdown – Super Admin only */}
+                      {superAdmin && allWgs.length > 1 && !isSelf && (
                         <div className="relative">
                           <Select
                             value={member.wgId}
                             onChange={(e) => handleWgChange(member, e.target.value)}
                             disabled={wgLoading === member.id}
                             className="text-xs h-8 py-0 pr-7 min-w-[120px] max-w-[160px]"
-                            title="WG zuweisen"
                           >
                             {allWgs.map((wg) => (
-                              <option key={wg.id} value={wg.id}>
-                                {wg.name}
-                              </option>
+                              <option key={wg.id} value={wg.id}>{wg.name}</option>
                             ))}
                           </Select>
                           {wgLoading === member.id && (
@@ -362,35 +336,24 @@ export default function AdminMembersPage() {
                       {!isSelf && (
                         <>
                           <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              'h-8 text-xs',
-                              member.role === 'ADMIN'
-                                ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
-                                : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50'
-                            )}
+                            variant="ghost" size="sm"
+                            className={cn('h-8 text-xs', member.role === 'ADMIN'
+                              ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
+                              : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50')}
                             disabled={roleLoading === member.id}
                             onClick={() => handleRoleChange(member)}
-                            title={member.role === 'ADMIN' ? 'Zum Mitglied degradieren' : 'Zum Admin befördern'}
                           >
-                            {roleLoading === member.id ? (
-                              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                            ) : member.role === 'ADMIN' ? (
-                              <ShieldOff className="h-3.5 w-3.5" />
-                            ) : (
-                              <Shield className="h-3.5 w-3.5" />
-                            )}
+                            {roleLoading === member.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              : member.role === 'ADMIN' ? <ShieldOff className="h-3.5 w-3.5" />
+                              : <Shield className="h-3.5 w-3.5" />}
                             <span className="hidden sm:inline">
                               {member.role === 'ADMIN' ? 'Degradieren' : 'Admin'}
                             </span>
                           </Button>
                           <Button
-                            variant="ghost"
-                            size="sm"
+                            variant="ghost" size="sm"
                             className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50"
                             onClick={() => { setRemoveTarget(member); setRemoveConfirm(''); setRemoveError('') }}
-                            title="Konto löschen"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                             <span className="hidden sm:inline">Entfernen</span>
@@ -406,17 +369,11 @@ export default function AdminMembersPage() {
         </CardContent>
       </Card>
 
-      <Dialog
-        open={!!removeTarget}
-        onOpenChange={(open) => {
-          if (!open) { setRemoveTarget(null); setRemoveConfirm(''); setRemoveError('') }
-        }}
-      >
+      <Dialog open={!!removeTarget} onOpenChange={(open) => { if (!open) { setRemoveTarget(null); setRemoveConfirm(''); setRemoveError('') } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="h-5 w-5" />
-              Mitglied entfernen?
+              <Trash2 className="h-5 w-5" />Mitglied entfernen?
             </DialogTitle>
           </DialogHeader>
           {removeTarget && (
@@ -431,27 +388,16 @@ export default function AdminMembersPage() {
                   <p className="text-xs text-gray-400">{removeTarget.email}</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-600">
-                Das Konto dieses Mitglieds wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
-              </p>
+              <p className="text-sm text-gray-600">Das Konto wird dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.</p>
               <div className="space-y-1">
-                <p className="text-xs text-gray-500">
-                  Gib <span className="font-semibold">{removeTarget.name}</span> ein um zu bestätigen:
-                </p>
-                <Input
-                  value={removeConfirm}
-                  onChange={(e) => setRemoveConfirm(e.target.value)}
-                  placeholder={removeTarget.name}
-                  disabled={removing}
-                />
+                <p className="text-xs text-gray-500">Gib <span className="font-semibold">{removeTarget.name}</span> ein um zu bestätigen:</p>
+                <Input value={removeConfirm} onChange={(e) => setRemoveConfirm(e.target.value)} placeholder={removeTarget.name} disabled={removing} />
               </div>
               {removeError && <p className="text-sm text-red-600 bg-red-50 rounded p-2">{removeError}</p>}
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRemoveTarget(null); setRemoveConfirm(''); setRemoveError('') }} disabled={removing}>
-              Abbrechen
-            </Button>
+            <Button variant="outline" onClick={() => { setRemoveTarget(null); setRemoveConfirm(''); setRemoveError('') }} disabled={removing}>Abbrechen</Button>
             <Button variant="destructive" onClick={handleRemove} disabled={removing || removeConfirm !== removeTarget?.name}>
               {removing ? 'Entferne…' : 'Entfernen'}
             </Button>
