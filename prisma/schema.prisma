@@ -9,6 +9,7 @@ datasource db {
 model WGConfig {
   id         String   @id @default(cuid())
   name       String
+  avatarUrl  String?
   inviteCode String   @unique @default(cuid())
   createdAt  DateTime @default(now())
 

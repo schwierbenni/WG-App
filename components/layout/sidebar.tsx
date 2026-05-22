@@ -8,7 +8,8 @@ import {
   ShoppingCart, CreditCard, User, Settings, Users,
   ChevronRight, Grid3X3, X, ListMusic, Shield,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { cn, getInitials } from '@/lib/utils'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface NavItem {
   href: string
@@ -43,6 +44,7 @@ interface SidebarProps {
   userEmail?: string
   userAvatar?: string | null
   wgName?: string
+  wgAvatarUrl?: string | null
 }
 
 /* ─── Desktop sidebar nav link ──────────────────────────────────────────── */
@@ -71,29 +73,43 @@ function SidebarNavLink({ item, onClick }: { item: NavItem; onClick?: () => void
 }
 
 /* ─── Desktop sidebar content ───────────────────────────────────────────── */
-function SidebarContent({ userRole, userEmail, wgName, onLinkClick }: { userRole?: string; userEmail?: string; wgName?: string; onLinkClick?: () => void }) {
+function SidebarContent({ userRole, userEmail, wgName, wgAvatarUrl, onLinkClick }: { userRole?: string; userEmail?: string; wgName?: string; wgAvatarUrl?: string | null; onLinkClick?: () => void }) {
   const isAdmin = userRole === 'ADMIN'
   const isSuperAdmin = !!userEmail && userEmail === SUPER_ADMIN_EMAIL
+  const displayName = wgName ?? 'Meine WG'
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--brand-600)] shadow-md">
-          <Home className="h-4 w-4 text-white" />
+      <Link href="/dashboard" onClick={onLinkClick} className="flex items-center gap-3 px-4 py-5 border-b border-white/10 hover:bg-white/5 transition-colors">
+        <div className="shrink-0">
+          {wgAvatarUrl ? (
+            <Avatar className="h-10 w-10 ring-2 ring-white/20 shadow-md">
+              <AvatarImage src={wgAvatarUrl} alt={displayName} className="object-cover" />
+              <AvatarFallback className="text-sm font-bold bg-[var(--brand-600)] text-white">
+                {getInitials(displayName)}
+              </AvatarFallback>
+            </Avatar>
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand-600)] shadow-md ring-2 ring-white/20">
+              <span className="text-sm font-extrabold text-white">
+                {getInitials(displayName)}
+              </span>
+            </div>
+          )}
         </div>
         <div className="min-w-0">
           <span
             className="block text-base font-extrabold text-white leading-none truncate"
             style={{ fontFamily: 'var(--font-syne, system-ui)' }}
           >
-            {wgName ?? 'Meine WG'}
+            {displayName}
           </span>
           <p className="text-[10px] text-[var(--sidebar-text)] leading-tight mt-0.5 tracking-widest uppercase">
             WG-App
           </p>
         </div>
-      </div>
+      </Link>
 
       {/* Main nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5">
@@ -139,13 +155,13 @@ function SidebarContent({ userRole, userEmail, wgName, onLinkClick }: { userRole
 }
 
 /* ─── Desktop sidebar ───────────────────────────────────────────────────── */
-export function Sidebar({ userRole, userEmail, wgName }: SidebarProps) {
+export function Sidebar({ userRole, userEmail, wgName, wgAvatarUrl }: SidebarProps) {
   return (
     <aside
       className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 h-full"
       style={{ background: 'var(--sidebar-bg)' }}
     >
-      <SidebarContent userRole={userRole} userEmail={userEmail} wgName={wgName} />
+      <SidebarContent userRole={userRole} userEmail={userEmail} wgName={wgName} wgAvatarUrl={wgAvatarUrl} />
     </aside>
   )
 }

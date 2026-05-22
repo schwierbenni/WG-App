@@ -26,6 +26,7 @@ interface HeaderProps {
   userEmail?: string | null
   userAvatar?: string | null
   wgName?: string
+  wgAvatarUrl?: string | null
 }
 
 function ThemeToggle() {
@@ -163,7 +164,7 @@ function NotificationBell() {
   )
 }
 
-export function Header({ userName, userEmail, userAvatar, wgName }: HeaderProps) {
+export function Header({ userName, userEmail, userAvatar, wgName, wgAvatarUrl }: HeaderProps) {
   const router = useRouter()
 
   async function handleSignOut() {
@@ -171,19 +172,33 @@ export function Header({ userName, userEmail, userAvatar, wgName }: HeaderProps)
     router.push('/login')
   }
 
+  const displayName = wgName ?? 'Meine WG'
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b-2 border-surface-border bg-surface px-4 shadow-sm">
-      {/* WG name – mobile only */}
+      {/* WG identity – mobile only */}
       <Link
         href="/dashboard"
-        className="lg:hidden"
+        className="lg:hidden flex items-center gap-2.5"
         aria-label="Dashboard"
       >
+        {wgAvatarUrl ? (
+          <Avatar className="h-7 w-7 shrink-0">
+            <AvatarImage src={wgAvatarUrl} alt={displayName} className="object-cover" />
+            <AvatarFallback className="text-[10px] font-bold bg-brand-muted text-brand-600">
+              {getInitials(displayName)}
+            </AvatarFallback>
+          </Avatar>
+        ) : (
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-muted shrink-0">
+            <span className="text-[10px] font-extrabold text-brand-600">{getInitials(displayName)}</span>
+          </div>
+        )}
         <span
           className="text-lg font-extrabold text-brand-600"
           style={{ fontFamily: 'var(--font-syne, system-ui)' }}
         >
-          {wgName ?? 'Meine WG'}
+          {displayName}
         </span>
       </Link>
 

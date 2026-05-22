@@ -3,7 +3,8 @@ import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
 const patchWgSchema = z.object({
-  name: z.string().min(1, 'Name darf nicht leer sein').max(100),
+  name: z.string().min(1, 'Name darf nicht leer sein').max(100).optional(),
+  avatarUrl: z.string().url('Ungültige URL').nullable().optional(),
 })
 
 export async function GET() {
@@ -14,7 +15,7 @@ export async function GET() {
   try {
     const wg = await prisma.wGConfig.findUnique({
       where: { id: wgId },
-      select: { id: true, name: true, inviteCode: true, createdAt: true },
+      select: { id: true, name: true, avatarUrl: true, inviteCode: true, createdAt: true },
     })
 
     if (!wg) return Response.json({ error: 'WG nicht gefunden.' }, { status: 404 })
@@ -43,10 +44,15 @@ export async function PATCH(request: Request) {
       return Response.json({ error: parsed.error.issues[0]?.message ?? 'Ungültige Eingabe.' }, { status: 400 })
     }
 
+    const { name, avatarUrl } = parsed.data
+    const data: Record<string, unknown> = {}
+    if (name !== undefined) data.name = name
+    if (avatarUrl !== undefined) data.avatarUrl = avatarUrl
+
     const wg = await prisma.wGConfig.update({
       where: { id: wgId },
-      data: { name: parsed.data.name },
-      select: { id: true, name: true, inviteCode: true, createdAt: true },
+      data,
+      select: { id: true, name: true, avatarUrl: true, inviteCode: true, createdAt: true },
     })
 
     return Response.json({ wg })
