@@ -19,6 +19,7 @@ model WGConfig {
   announcements    Announcement[]
   shoppingItems    ShoppingItem[]
   expenses         Expense[]
+  settlements      Settlement[]
   notifications    Notification[]
   inviteTokens     InviteToken[]
   spotifyPlaylists SpotifyPlaylist[]
@@ -44,6 +45,8 @@ model User {
   reactions          AnnouncementReaction[]
   shoppingItems      ShoppingItem[]
   expenses           Expense[]
+  settlementsFrom    Settlement[]           @relation("SettlementFrom")
+  settlementsTo      Settlement[]           @relation("SettlementTo")
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
   spotifyPlaylists   SpotifyPlaylist[]
@@ -171,6 +174,8 @@ model Expense {
   category    ExpenseCategory @default(SONSTIGES)
   paidBy      String
   splitWith   String[]
+  splitMode   SplitMode       @default(EQUAL)
+  splits      Json?
   date        DateTime        @default(now())
   settledAt   DateTime?
   createdAt   DateTime        @default(now())
@@ -179,11 +184,31 @@ model Expense {
   paidByUser User     @relation(fields: [paidBy], references: [id])
 }
 
+model Settlement {
+  id          String   @id @default(cuid())
+  wgId        String
+  fromUserId  String
+  toUserId    String
+  amount      Float
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  wg       WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  fromUser User     @relation("SettlementFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User     @relation("SettlementTo", fields: [toUserId], references: [id], onDelete: Cascade)
+}
+
 enum ExpenseCategory {
   LEBENSMITTEL
   HAUSHALT
   MIETE_NEBENKOSTEN
   SONSTIGES
+}
+
+enum SplitMode {
+  EQUAL
+  INDIVIDUAL
+  PERCENTAGE
 }
 
 model Notification {
