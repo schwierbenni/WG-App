@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Clock,
   CheckCircle2,
@@ -23,7 +24,26 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { SwapDialog } from '@/components/duties/swap-dialog'
+import { SwapResponseModal } from '@/components/duties/swap-response-modal'
 import { cn, formatDate, getInitials, getIntervalLabel } from '@/lib/utils'
+
+function SwapDeepLink({ onSuccess }: { onSuccess: () => void }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const swapId = searchParams.get('swap')
+
+  if (!swapId) return null
+
+  const close = () => router.replace('/duties')
+
+  return (
+    <SwapResponseModal
+      swapId={swapId}
+      onClose={close}
+      onSuccess={() => { close(); onSuccess() }}
+    />
+  )
+}
 
 interface SimpleUser {
   id: string
@@ -89,6 +109,11 @@ interface AssignDialogState {
   duty: DutyWithAssignment
 }
 
+interface PendingOutSwap {
+  assignmentId: string
+  toUser: { name: string; avatarUrl?: string | null }
+}
+
 export default function DutiesPage() {
   const { data: session } = useSession()
   const [duties, setDuties] = React.useState<DutyWithAssignment[]>([])
@@ -102,14 +127,16 @@ export default function DutiesPage() {
   const [assignDueDate, setAssignDueDate] = React.useState('')
   const [assigning, setAssigning] = React.useState(false)
   const [assignError, setAssignError] = React.useState('')
+  const [pendingOut, setPendingOut] = React.useState<PendingOutSwap[]>([])
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [dutiesRes, usersRes] = await Promise.all([
+      const [dutiesRes, usersRes, swapsRes] = await Promise.all([
         fetch('/api/duties'),
         fetch('/api/users'),
+        fetch('/api/swap-requests?direction=sent'),
       ])
       if (!dutiesRes.ok) throw new Error('Fehler beim Laden der Dienste')
       if (!usersRes.ok) throw new Error('Fehler beim Laden der Mitglieder')
@@ -117,6 +144,15 @@ export default function DutiesPage() {
       const usersData = await usersRes.json()
       setDuties(dutiesData.duties ?? [])
       setMembers(usersData.users ?? [])
+      if (swapsRes.ok) {
+        const swapsData = await swapsRes.json()
+        setPendingOut(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (swapsData.swapRequests as any[])
+            .filter((r) => r.status === 'PENDING')
+            .map((r) => ({ assignmentId: r.assignment.id, toUser: r.toUser }))
+        )
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -278,6 +314,9 @@ export default function DutiesPage() {
             const isMyAssignment = assignment?.user?.id === session?.user?.id
             const canComplete = assignment && !assignment.completedAt && (isMyAssignment || isAdmin)
             const canUncomplete = assignment?.completedAt && isAdmin
+            const pendingSwap = assignment
+              ? pendingOut.find((p) => p.assignmentId === assignment.id) ?? null
+              : null
 
             return (
               <Card
@@ -348,14 +387,26 @@ export default function DutiesPage() {
                       </div>
 
                       {isMyAssignment && !assignment.completedAt && (
-                        <SwapDialog
-                          assignmentId={assignment.id}
-                          dutyName={duty.name}
-                          dutyEmoji={duty.emoji}
-                          dueDate={assignment.dueDate}
-                          members={members}
-                          onSuccess={fetchData}
-                        />
+                        pendingSwap ? (
+                          <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+                            <Clock className="h-4 w-4 text-amber-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-amber-800">Tauschangfrage ausstehend</p>
+                              <p className="text-xs text-amber-600 truncate">
+                                Gesendet an {pendingSwap.toUser.name}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <SwapDialog
+                            assignmentId={assignment.id}
+                            dutyName={duty.name}
+                            dutyEmoji={duty.emoji}
+                            dueDate={assignment.dueDate}
+                            members={members}
+                            onSuccess={fetchData}
+                          />
+                        )
                       )}
 
                       {canComplete && (
@@ -408,6 +459,11 @@ export default function DutiesPage() {
           })}
         </div>
       )}
+
+      {/* Swap response modal – opened via push notification deep-link (?swap=<id>) */}
+      <React.Suspense>
+        <SwapDeepLink onSuccess={fetchData} />
+      </React.Suspense>
 
       {/* Assign duty dialog */}
       <Dialog open={!!assignDialog} onOpenChange={(open) => !open && setAssignDialog(null)}>

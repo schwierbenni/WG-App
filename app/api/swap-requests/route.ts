@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       data: { wgId, userId: toUserId, type: 'SWAP_REQUEST', message: swapMessage },
     })
 
-    sendPushToUser(toUserId, { title: 'Tausch-Anfrage', body: swapMessage, url: '/duties' }).catch(() => {})
+    sendPushToUser(toUserId, { title: 'Tausch-Anfrage', body: swapMessage, url: `/duties?swap=${swapRequest.id}` }).catch(() => {})
 
     return Response.json({ swapRequest }, { status: 201 })
   } catch (error) {
