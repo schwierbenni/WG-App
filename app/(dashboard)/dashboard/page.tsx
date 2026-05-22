@@ -2,195 +2,67 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/db'
 import { DutyCard } from '@/components/dashboard/duty-card'
 import { AssignmentOverview } from '@/components/dashboard/assignment-overview'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
 import {
   ClipboardList, Megaphone, ArrowLeftRight, AlertCircle,
   User, ShoppingCart, Wallet, Calendar, Receipt,
 } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
 
-interface SimpleUser {
-  id: string
-  name: string
-  email: string
-  avatarUrl?: string | null
-}
+// ─── settlement helper (mirrors /api/expenses/settlements) ───────────────────
 
-interface DutyAssignment {
-  id: string
-  dueDate: string
-  completedAt: string | null
-  duty: {
-    id: string
-    name: string
-    emoji: string | null
-    color: string
-    checklistItems: string[]
+function computeShareForExpense(
+  expense: { amount: number; splitWith: string[]; splitMode: string; splits: unknown },
+  userId: string,
+): number {
+  if (expense.splitMode === 'INDIVIDUAL') {
+    const s = expense.splits as Record<string, number> | null
+    return s?.[userId] ?? 0
   }
-  user: SimpleUser
-}
-
-interface Announcement {
-  id: string
-  content: string
-  createdAt: string
-  author: SimpleUser
-}
-
-interface SwapRequest {
-  id: string
-  status: string
-  createdAt: string
-  fromUser: SimpleUser
-  assignment: {
-    id: string
-    dueDate: string
-    duty: { id: string; name: string; emoji: string | null }
+  if (expense.splitMode === 'PERCENTAGE') {
+    const s = expense.splits as Record<string, number> | null
+    return expense.amount * ((s?.[userId] ?? 0) / 100)
   }
+  return expense.amount / expense.splitWith.length
 }
 
-interface ShoppingItem {
-  id: string
-  name: string
-  boughtAt: string | null
-}
-
-interface Expense {
-  id: string
-  amount: number
-  description: string
-  paidBy: string
-  splitWith: string[]
-  date: string
-  paidByUser: SimpleUser
-}
-
-interface NetSettlement {
-  fromUserId: string
-  fromUserName: string
-  toUserId: string
-  toUserName: string
-  amount: number
-}
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
-
-async function fetchMyAssignments(cookie: string): Promise<DutyAssignment[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/assignments?userId=me&limit=20`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.assignments ?? []
-  } catch { return [] }
-}
-
-async function fetchAllAssignments(cookie: string): Promise<DutyAssignment[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/assignments?limit=50`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.assignments ?? []
-  } catch { return [] }
-}
-
-async function fetchAnnouncements(cookie: string): Promise<Announcement[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/announcements?limit=3`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.announcements ?? []
-  } catch { return [] }
-}
-
-async function fetchPendingSwapRequests(cookie: string): Promise<SwapRequest[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/swap-requests?direction=received&status=PENDING`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.swapRequests ?? []
-  } catch { return [] }
-}
-
-async function fetchMembers(cookie: string): Promise<SimpleUser[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/users`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.users ?? []
-  } catch { return [] }
-}
-
-async function fetchShoppingItems(cookie: string): Promise<ShoppingItem[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/shopping`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.items ?? []
-  } catch { return [] }
-}
-
-async function fetchExpenses(cookie: string): Promise<Expense[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/expenses`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.expenses ?? []
-  } catch { return [] }
-}
-
-async function fetchSettlements(cookie: string): Promise<NetSettlement[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/api/expenses/settlements`, { headers: { cookie }, cache: 'no-store' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.settlements ?? []
-  } catch { return [] }
-}
-
-function splitAssignments(assignments: DutyAssignment[]) {
-  const now = new Date()
-  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
-  const overdue: DutyAssignment[] = []
-  const thisWeek: DutyAssignment[] = []
-  const later: DutyAssignment[] = []
-  const done: DutyAssignment[] = []
-
-  for (const a of assignments) {
-    if (a.completedAt) { done.push(a); continue }
-    const due = new Date(a.dueDate)
-    if (due < now) overdue.push(a)
-    else if (due <= weekFromNow) thisWeek.push(a)
-    else later.push(a)
+function computeMyBalance(
+  expenses: { paidBy: string; splitWith: string[]; amount: number; splitMode: string; splits: unknown }[],
+  userId: string,
+): { iOwe: number; owedToMe: number; net: number } {
+  let iOwe = 0
+  let owedToMe = 0
+  for (const e of expenses) {
+    if (e.paidBy === userId) {
+      // Others owe me their shares
+      for (const uid of e.splitWith) {
+        if (uid !== userId) owedToMe += computeShareForExpense(e, uid)
+      }
+    } else if (e.splitWith.includes(userId)) {
+      // I owe the payer my share
+      iOwe += computeShareForExpense(e, userId)
+    }
   }
-  return { overdue, thisWeek, later, done }
+  return { iOwe, owedToMe, net: owedToMe - iOwe }
 }
 
-function computeMyBalance(settlements: NetSettlement[], userId: string): { iOwe: number; owedToMe: number } {
-  const iOwe = settlements.filter((s) => s.fromUserId === userId).reduce((s, x) => s + x.amount, 0)
-  const owedToMe = settlements.filter((s) => s.toUserId === userId).reduce((s, x) => s + x.amount, 0)
-  return { iOwe, owedToMe }
-}
+// ─── shared sub-types ────────────────────────────────────────────────────────
 
 function SectionHeader({
   icon: Icon,
   title,
   count,
-  className = '',
 }: {
   icon: React.ComponentType<{ className?: string }>
   title: string
   count?: number
-  className?: string
 }) {
   return (
     <div className="flex items-center gap-2.5 mb-4">
-      <Icon className={`h-5 w-5 text-brand-600 ${className}`} />
-      <h2
-        className="text-base font-bold text-foreground"
-        style={{ fontFamily: 'var(--font-syne, system-ui)' }}
-      >
+      <Icon className="h-5 w-5 text-brand-600" />
+      <h2 className="text-base font-bold text-foreground" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
         {title}
       </h2>
       {count !== undefined && (
@@ -210,46 +82,158 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
+// ─── page ────────────────────────────────────────────────────────────────────
+
 export default async function DashboardPage() {
   const session = await auth()
   if (!session?.user) redirect('/login')
 
-  const { cookies } = await import('next/headers')
-  const cookieStore = await cookies()
-  const cookieHeader = cookieStore.getAll().map((c) => `${c.name}=${c.value}`).join('; ')
+  const userId = session.user.id
+  const wgId = (session.user as { wgId?: string }).wgId
+  if (!wgId) redirect('/login')
 
+  const now = new Date()
+  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+  // Fetch all data in parallel via Prisma (no internal HTTP round-trips)
   const [
-    myAssignments, allAssignments, announcements,
-    swapRequests, members, shoppingItems, expenses, debtSettlements,
+    myAssignmentsRaw,
+    allAssignmentsRaw,
+    announcements,
+    swapRequests,
+    members,
+    openShoppingCount,
+    recentExpenses,
+    unsettledExpenses,
   ] = await Promise.all([
-    fetchMyAssignments(cookieHeader),
-    fetchAllAssignments(cookieHeader),
-    fetchAnnouncements(cookieHeader),
-    fetchPendingSwapRequests(cookieHeader),
-    fetchMembers(cookieHeader),
-    fetchShoppingItems(cookieHeader),
-    fetchExpenses(cookieHeader),
-    fetchSettlements(cookieHeader),
+    // My open assignments
+    prisma.dutyAssignment.findMany({
+      where: { wgId, userId, completedAt: null },
+      include: {
+        duty: { select: { id: true, name: true, emoji: true, color: true, checklistItems: true } },
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+    }),
+    // All open assignments for timeline + overview
+    prisma.dutyAssignment.findMany({
+      where: { wgId, completedAt: null },
+      include: {
+        duty: { select: { id: true, name: true, emoji: true, color: true, checklistItems: true } },
+        user: { select: { id: true, name: true, email: true, avatarUrl: true } },
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 50,
+    }),
+    // Recent announcements
+    prisma.announcement.findMany({
+      where: { wgId },
+      include: { author: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    }),
+    // Pending swap requests addressed to me
+    prisma.swapRequest.findMany({
+      where: { wgId, toUserId: userId, status: 'PENDING' },
+      include: {
+        fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
+        assignment: {
+          include: { duty: { select: { id: true, name: true, emoji: true } } },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    // All WG members (needed for SwapDialog inside DutyCard)
+    prisma.user.findMany({
+      where: { wgId },
+      select: { id: true, name: true, email: true, avatarUrl: true },
+    }),
+    // Open shopping items count
+    prisma.shoppingItem.count({ where: { wgId, boughtAt: null } }),
+    // Recent expenses
+    prisma.expense.findMany({
+      where: { wgId },
+      include: { paidByUser: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+      orderBy: { date: 'desc' },
+      take: 5,
+    }),
+    // Unsettled expenses (for balance computation)
+    prisma.expense.findMany({
+      where: { wgId, settledAt: null },
+      select: { paidBy: true, splitWith: true, amount: true, splitMode: true, splits: true },
+    }),
   ])
 
-  const { overdue, thisWeek, later } = splitAssignments(myAssignments)
+  // ── Categorise my assignments ────────────────────────────────────────────
+  const overdue: typeof myAssignmentsRaw = []
+  const thisWeek: typeof myAssignmentsRaw = []
+  const later: typeof myAssignmentsRaw = []
+
+  for (const a of myAssignmentsRaw) {
+    const due = new Date(a.dueDate)
+    if (due < now) overdue.push(a)
+    else if (due <= weekFromNow) thisWeek.push(a)
+    else later.push(a)
+  }
+
   const pendingMyAssignments = [...overdue, ...thisWeek, ...later]
 
-  const openShoppingItems = shoppingItems.filter((i) => !i.boughtAt).length
-  const { iOwe, owedToMe } = computeMyBalance(debtSettlements, session.user.id)
-  const myBalance = owedToMe - iOwe
-
-  const upcomingAll = allAssignments
-    .filter((a) => !a.completedAt && new Date(a.dueDate) >= new Date())
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+  // ── Next 5 upcoming duties (whole WG) ───────────────────────────────────
+  const upcomingAll = allAssignmentsRaw
+    .filter((a) => new Date(a.dueDate) >= now)
     .slice(0, 5)
 
-  const userName = session.user.name ?? 'Mitglied'
-  const firstName = userName.split(' ')[0]
-  const userId = session.user.id
+  // ── Balance ─────────────────────────────────────────────────────────────
+  const { iOwe, owedToMe, net: myBalance } = computeMyBalance(unsettledExpenses, userId)
 
-  const hour = new Date().getHours()
+  // Compact debt lines for the WG-Kasse card (max 3)
+  const memberNameMap = new Map(members.map((m) => [m.id, m.name]))
+
+  // People who owe me (I paid, they're in splitWith)
+  const owedToMeLines: { name: string; amount: number }[] = []
+  // People I owe (they paid, I'm in splitWith)
+  const iOweLines: { name: string; amount: number }[] = []
+
+  {
+    const toMe = new Map<string, number>()
+    const fromMe = new Map<string, number>()
+
+    for (const e of unsettledExpenses) {
+      if (e.paidBy === userId) {
+        for (const uid of e.splitWith) {
+          if (uid !== userId) {
+            toMe.set(uid, (toMe.get(uid) ?? 0) + computeShareForExpense(e, uid))
+          }
+        }
+      } else if (e.splitWith.includes(userId)) {
+        fromMe.set(e.paidBy, (fromMe.get(e.paidBy) ?? 0) + computeShareForExpense(e, userId))
+      }
+    }
+
+    for (const [uid, amt] of toMe) {
+      if (amt >= 0.01) owedToMeLines.push({ name: memberNameMap.get(uid) ?? uid, amount: amt })
+    }
+    for (const [uid, amt] of fromMe) {
+      if (amt >= 0.01) iOweLines.push({ name: memberNameMap.get(uid) ?? uid, amount: amt })
+    }
+  }
+
+  const allDebtLines = [
+    ...iOweLines.map((l) => ({ text: `Du schuldest ${l.name} ${formatCurrency(l.amount)}`, negative: true })),
+    ...owedToMeLines.map((l) => ({ text: `${l.name} schuldet dir ${formatCurrency(l.amount)}`, negative: false })),
+  ].slice(0, 3)
+
+  // ── Greeting ────────────────────────────────────────────────────────────
+  const firstName = (session.user.name ?? 'Mitglied').split(' ')[0]
+  const hour = now.getHours()
   const greeting = hour < 12 ? 'Guten Morgen' : hour < 18 ? 'Guten Tag' : 'Guten Abend'
+
+  // Serialise Date objects to strings for client components
+  const allAssignments = allAssignmentsRaw.map((a) => ({
+    ...a,
+    dueDate: a.dueDate.toISOString(),
+    completedAt: a.completedAt?.toISOString() ?? null,
+  }))
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -264,7 +248,7 @@ export default async function DashboardPage() {
             {greeting}, {firstName}!
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-1">
-            {new Date().toLocaleDateString('de-DE', {
+            {now.toLocaleDateString('de-DE', {
               weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
             })}
           </p>
@@ -273,22 +257,22 @@ export default async function DashboardPage() {
         {/* Status chips */}
         <div className="flex flex-wrap gap-2.5">
           {overdue.length > 0 && (
-            <div className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[var(--danger-bg)] px-4 py-2.5 text-center min-w-[72px]">
+            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[var(--danger-bg)] px-4 py-2.5 text-center min-w-[72px] hover:shadow-md transition-shadow">
               <p className="text-xl font-extrabold text-[var(--danger)] leading-none">{overdue.length}</p>
               <p className="text-xs text-[var(--danger)] opacity-80 mt-0.5">Überfällig</p>
-            </div>
+            </Link>
           )}
           {thisWeek.length > 0 && (
-            <div className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[var(--warning-bg)] px-4 py-2.5 text-center min-w-[72px]">
+            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[var(--warning-bg)] px-4 py-2.5 text-center min-w-[72px] hover:shadow-md transition-shadow">
               <p className="text-xl font-extrabold text-[var(--warning)] leading-none">{thisWeek.length}</p>
               <p className="text-xs text-[var(--warning)] opacity-80 mt-0.5">Diese Woche</p>
-            </div>
+            </Link>
           )}
           {swapRequests.length > 0 && (
-            <div className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--brand-600)_30%,transparent)] bg-brand-muted px-4 py-2.5 text-center min-w-[72px]">
+            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--brand-600)_30%,transparent)] bg-brand-muted px-4 py-2.5 text-center min-w-[72px] hover:shadow-md transition-shadow">
               <p className="text-xl font-extrabold text-brand-600 leading-none">{swapRequests.length}</p>
               <p className="text-xs text-brand-600 opacity-80 mt-0.5">Tausch</p>
-            </div>
+            </Link>
           )}
         </div>
       </div>
@@ -307,14 +291,12 @@ export default async function DashboardPage() {
               Einkaufsliste
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              {openShoppingItems === 0
-                ? 'Alles besorgt ✓'
-                : `${openShoppingItems} Artikel ausstehend`}
+              {openShoppingCount === 0 ? 'Alles besorgt ✓' : `${openShoppingCount} Artikel ausstehend`}
             </p>
           </div>
-          {openShoppingItems > 0 && (
+          {openShoppingCount > 0 && (
             <span className="ml-auto flex h-7 w-7 items-center justify-center rounded-full bg-[var(--success)] text-[11px] font-bold text-white shrink-0">
-              {openShoppingItems}
+              {openShoppingCount}
             </span>
           )}
         </Link>
@@ -335,28 +317,23 @@ export default async function DashboardPage() {
                 {myBalance === 0
                   ? 'Alles ausgeglichen'
                   : myBalance > 0
-                    ? `Du bekommst ${myBalance.toFixed(2)} €`
-                    : `Du schuldest ${Math.abs(myBalance).toFixed(2)} €`}
+                  ? `Du bekommst ${formatCurrency(owedToMe)}`
+                  : `Du schuldest ${formatCurrency(iOwe)}`}
               </p>
             </div>
             {myBalance !== 0 && (
               <span className={`text-sm font-extrabold shrink-0 ${myBalance > 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
-                {myBalance > 0 ? '+' : ''}{myBalance.toFixed(2)} €
+                {myBalance > 0 ? '+' : ''}{formatCurrency(Math.abs(myBalance))}
               </span>
             )}
           </div>
-          {debtSettlements.length > 0 && (
+          {allDebtLines.length > 0 && (
             <div className="space-y-1 mt-1">
-              {debtSettlements.filter((s) => s.fromUserId === userId || s.toUserId === userId).slice(0, 3).map((s) => {
-                const isMyDebt = s.fromUserId === userId
-                return (
-                  <p key={`${s.fromUserId}-${s.toUserId}`} className={`text-xs ${isMyDebt ? 'text-[var(--danger)]' : 'text-[var(--success)]'}`}>
-                    {isMyDebt
-                      ? `Du schuldest ${s.toUserName} ${s.amount.toFixed(2)} €`
-                      : `${s.fromUserName} schuldet dir ${s.amount.toFixed(2)} €`}
-                  </p>
-                )
-              })}
+              {allDebtLines.map((line, i) => (
+                <p key={i} className={`text-xs ${line.negative ? 'text-[var(--danger)]' : 'text-[var(--success)]'}`}>
+                  {line.text}
+                </p>
+              ))}
             </div>
           )}
         </Link>
@@ -369,17 +346,20 @@ export default async function DashboardPage() {
             <ArrowLeftRight className="h-5 w-5 text-brand-600 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-brand-600" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
-                {swapRequests.length}{' '}
-                {swapRequests.length === 1 ? 'ausstehende Tauschangfrage' : 'ausstehende Tauschangfragen'}
+                {swapRequests.length === 1 ? '1 ausstehende Tauschangfrage' : `${swapRequests.length} ausstehende Tauschangfragen`}
               </p>
               <div className="mt-2 space-y-1">
                 {swapRequests.slice(0, 3).map((req) => (
-                  <p key={req.id} className="text-xs text-brand-600 opacity-80">
+                  <Link
+                    key={req.id}
+                    href={`/duties?swap=${req.id}`}
+                    className="block text-xs text-brand-600 opacity-80 hover:opacity-100 transition-opacity"
+                  >
                     <span className="font-semibold">{req.fromUser.name}</span> möchte{' '}
                     {req.assignment.duty.emoji && <span className="mr-0.5">{req.assignment.duty.emoji}</span>}
                     <span className="font-semibold">{req.assignment.duty.name}</span> tauschen
-                    (fällig: {formatDate(req.assignment.dueDate)})
-                  </p>
+                    (fällig: {formatDate(req.assignment.dueDate.toISOString())})
+                  </Link>
                 ))}
                 {swapRequests.length > 3 && (
                   <p className="text-xs text-brand-600 opacity-60">und {swapRequests.length - 3} weitere…</p>
@@ -411,7 +391,13 @@ export default async function DashboardPage() {
                       Überfällig ({overdue.length})
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {overdue.map((a) => <DutyCard key={a.id} assignment={a} members={members} />)}
+                      {overdue.map((a) => (
+                        <DutyCard
+                          key={a.id}
+                          assignment={{ ...a, dueDate: a.dueDate.toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
+                          members={members}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -422,7 +408,13 @@ export default async function DashboardPage() {
                       Diese Woche ({thisWeek.length})
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {thisWeek.map((a) => <DutyCard key={a.id} assignment={a} members={members} />)}
+                      {thisWeek.map((a) => (
+                        <DutyCard
+                          key={a.id}
+                          assignment={{ ...a, dueDate: a.dueDate.toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
+                          members={members}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -433,7 +425,13 @@ export default async function DashboardPage() {
                       Demnächst ({later.length})
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
-                      {later.map((a) => <DutyCard key={a.id} assignment={a} members={members} />)}
+                      {later.map((a) => (
+                        <DutyCard
+                          key={a.id}
+                          assignment={{ ...a, dueDate: a.dueDate.toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
+                          members={members}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -449,7 +447,7 @@ export default async function DashboardPage() {
                 {upcomingAll.map((a) => {
                   const isMe = a.user.id === userId
                   const dueDate = new Date(a.dueDate)
-                  const daysLeft = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                  const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                   return (
                     <div
                       key={a.id}
@@ -459,9 +457,7 @@ export default async function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">
                           {a.duty.name}
-                          {isMe && (
-                            <span className="ml-2 text-xs font-normal text-brand-600">(du)</span>
-                          )}
+                          {isMe && <span className="ml-2 text-xs font-normal text-brand-600">(du)</span>}
                         </p>
                         <p className="text-xs text-[var(--text-muted)]">{a.user.name}</p>
                       </div>
@@ -479,14 +475,15 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Right: Announcements + Recent Expenses */}
+        {/* Right column: announcements + recent expenses */}
         <div className="space-y-6">
+
           {/* Recent expenses */}
-          {expenses.length > 0 && (
+          {recentExpenses.length > 0 && (
             <section>
               <SectionHeader icon={Receipt} title="Letzte Ausgaben" />
               <div className="rounded-2xl border-2 border-surface-border bg-surface overflow-hidden shadow-sm divide-y divide-surface-border">
-                {expenses.slice(0, 5).map((e) => {
+                {recentExpenses.map((e) => {
                   const isMyPayment = e.paidBy === userId
                   return (
                     <div key={e.id} className="flex items-center gap-3 px-4 py-3">
@@ -511,6 +508,7 @@ export default async function DashboardPage() {
             </section>
           )}
 
+          {/* Announcements */}
           <section>
             <SectionHeader icon={Megaphone} title="Ankündigungen" count={announcements.length} />
 
@@ -541,7 +539,6 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                 ))}
-
                 <Link
                   href="/announcements"
                   className="block text-center text-xs font-semibold text-brand-600 hover:text-brand-700 py-1 transition-colors"
