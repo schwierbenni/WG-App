@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useSession } from 'next-auth/react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Clock,
   CheckCircle2,
@@ -23,7 +24,26 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { SwapDialog } from '@/components/duties/swap-dialog'
+import { SwapResponseModal } from '@/components/duties/swap-response-modal'
 import { cn, formatDate, getInitials, getIntervalLabel } from '@/lib/utils'
+
+function SwapDeepLink({ onSuccess }: { onSuccess: () => void }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const swapId = searchParams.get('swap')
+
+  if (!swapId) return null
+
+  const close = () => router.replace('/duties')
+
+  return (
+    <SwapResponseModal
+      swapId={swapId}
+      onClose={close}
+      onSuccess={() => { close(); onSuccess() }}
+    />
+  )
+}
 
 interface SimpleUser {
   id: string
@@ -408,6 +428,11 @@ export default function DutiesPage() {
           })}
         </div>
       )}
+
+      {/* Swap response modal – opened via push notification deep-link (?swap=<id>) */}
+      <React.Suspense>
+        <SwapDeepLink onSuccess={fetchData} />
+      </React.Suspense>
 
       {/* Assign duty dialog */}
       <Dialog open={!!assignDialog} onOpenChange={(open) => !open && setAssignDialog(null)}>

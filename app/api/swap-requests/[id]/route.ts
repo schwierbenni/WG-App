@@ -5,6 +5,7 @@ import { sendPushToUser } from '@/lib/push'
 
 const patchSwapSchema = z.object({
   action: z.enum(['accept', 'reject']),
+  message: z.string().max(500).optional(),
 })
 
 export async function GET(
@@ -72,12 +73,12 @@ export async function PATCH(
     if (swapRequest.toUserId !== session.user.id) return Response.json({ error: 'Only the recipient can accept or reject' }, { status: 403 })
     if (swapRequest.status !== 'PENDING') return Response.json({ error: 'Swap request is no longer pending' }, { status: 409 })
 
-    const { action } = parsed.data
+    const { action, message } = parsed.data
     const newStatus = action === 'accept' ? 'ACCEPTED' : 'REJECTED'
 
     const updated = await prisma.swapRequest.update({
       where: { id },
-      data: { status: newStatus },
+      data: { status: newStatus, message: message ?? null },
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
@@ -90,6 +91,17 @@ export async function PATCH(
         where: { id: swapRequest.assignmentId },
         data: { userId: swapRequest.toUserId },
       })
+
+      // Swap the two users' positions in the duty's rotation order
+      const duty = swapRequest.assignment.duty
+      const order = duty.rotationOrder
+      const fromIdx = order.indexOf(swapRequest.fromUserId)
+      const toIdx = order.indexOf(swapRequest.toUserId)
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const newOrder = [...order]
+        ;[newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]]
+        await prisma.duty.update({ where: { id: duty.id }, data: { rotationOrder: newOrder } })
+      }
 
       const acceptMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" angenommen.`
       const assignMsg = `Du wurdest nach dem Tausch für "${swapRequest.assignment.duty.name}" eingeteilt.`
@@ -104,7 +116,8 @@ export async function PATCH(
       sendPushToUser(swapRequest.fromUserId, { title: 'Tausch angenommen', body: acceptMsg, url: '/duties' }).catch(() => {})
       sendPushToUser(swapRequest.toUserId, { title: 'Neue Zuteilung', body: assignMsg, url: '/duties' }).catch(() => {})
     } else {
-      const rejectMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" abgelehnt.`
+      const reasonSuffix = message ? `: „${message}"` : ''
+      const rejectMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" abgelehnt${reasonSuffix}.`
 
       await prisma.notification.create({
         data: { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: rejectMsg },
