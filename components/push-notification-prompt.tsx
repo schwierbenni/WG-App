@@ -27,14 +27,44 @@ export function PushNotificationPrompt() {
       !('PushManager' in window)
     ) return
 
-    if (Notification.permission === 'granted') return
     if (Notification.permission === 'denied') return
+
+    if (Notification.permission === 'granted') {
+      ensureSubscription()
+      return
+    }
+
     if (localStorage.getItem(STORAGE_KEY)) return
 
     // Delay prompt slightly so it doesn't pop immediately on load
     const timer = setTimeout(() => setVisible(true), 3000)
     return () => clearTimeout(timer)
   }, [])
+
+  async function ensureSubscription() {
+    try {
+      const reg = await navigator.serviceWorker.ready
+      const res = await fetch('/api/push/vapid-public-key')
+      const { key } = await res.json()
+      if (!key) return
+
+      let subscription = await reg.pushManager.getSubscription()
+      if (!subscription) {
+        subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        })
+      }
+
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription.toJSON()),
+      })
+    } catch (err) {
+      console.error('Push subscription ensure failed:', err)
+    }
+  }
 
   async function handleAllow() {
     setLoading(true)
