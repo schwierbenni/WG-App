@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, getInitials, formatDate } from '@/lib/utils'
+import { PushNotificationToggle } from '@/components/push-notification-toggle'
 
 interface UserProfile {
   id: string
@@ -276,6 +277,10 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+
+            <Separator />
+
+            <PushNotificationToggle />
 
             <Separator />
 

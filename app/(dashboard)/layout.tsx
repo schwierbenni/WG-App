@@ -47,7 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       </div>
 
       {/* Mobile bottom navigation */}
-      <BottomNav userRole={role} />
+      <BottomNav userRole={role} userEmail={email ?? undefined} />
 
       {/* Push notification permission prompt */}
       <PushNotificationPrompt />

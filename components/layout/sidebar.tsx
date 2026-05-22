@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   Home, ClipboardList, Calendar, BarChart2, Megaphone,
   ShoppingCart, CreditCard, User, Settings, Users,
-  ChevronRight, Grid3X3, X, ListMusic,
+  ChevronRight, Grid3X3, X, ListMusic, Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -34,6 +34,8 @@ const adminNavItems: NavItem[] = [
   { href: '/admin/members',  label: 'Mitglieder',        icon: Users,    adminOnly: true },
   { href: '/admin/wg',       label: 'WG-Einstellungen',  icon: Home,     adminOnly: true },
 ]
+
+const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL ?? 'schwier.b@gmail.com'
 
 interface SidebarProps {
   userRole?: string
@@ -69,8 +71,9 @@ function SidebarNavLink({ item, onClick }: { item: NavItem; onClick?: () => void
 }
 
 /* ─── Desktop sidebar content ───────────────────────────────────────────── */
-function SidebarContent({ userRole, wgName, onLinkClick }: { userRole?: string; wgName?: string; onLinkClick?: () => void }) {
+function SidebarContent({ userRole, userEmail, wgName, onLinkClick }: { userRole?: string; userEmail?: string; wgName?: string; onLinkClick?: () => void }) {
   const isAdmin = userRole === 'ADMIN'
+  const isSuperAdmin = !!userEmail && userEmail === SUPER_ADMIN_EMAIL
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -111,6 +114,18 @@ function SidebarContent({ userRole, wgName, onLinkClick }: { userRole?: string; 
             ))}
           </div>
         )}
+
+        {isSuperAdmin && (
+          <div className="pt-4">
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-widest text-[var(--sidebar-text)] opacity-50">
+              Super Admin
+            </p>
+            <SidebarNavLink
+              item={{ href: '/super-admin', label: 'Alle WGs', icon: Shield }}
+              onClick={onLinkClick}
+            />
+          </div>
+        )}
       </nav>
 
       {/* Footer */}
@@ -124,13 +139,13 @@ function SidebarContent({ userRole, wgName, onLinkClick }: { userRole?: string; 
 }
 
 /* ─── Desktop sidebar ───────────────────────────────────────────────────── */
-export function Sidebar({ userRole, wgName }: SidebarProps) {
+export function Sidebar({ userRole, userEmail, wgName }: SidebarProps) {
   return (
     <aside
       className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 h-full"
       style={{ background: 'var(--sidebar-bg)' }}
     >
-      <SidebarContent userRole={userRole} wgName={wgName} />
+      <SidebarContent userRole={userRole} userEmail={userEmail} wgName={wgName} />
     </aside>
   )
 }
@@ -172,11 +187,12 @@ function BottomNavLink({
   )
 }
 
-export function BottomNav({ userRole }: { userRole?: string }) {
+export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmail?: string }) {
   const pathname = usePathname()
   const [moreOpen, setMoreOpen] = useState(false)
 
   const isAdmin = userRole === 'ADMIN'
+  const isSuperAdmin = !!userEmail && userEmail === SUPER_ADMIN_EMAIL
 
   const moreItems = [
     { href: '/calendar',   label: 'Kalender',    icon: Calendar },
@@ -190,6 +206,7 @@ export function BottomNav({ userRole }: { userRole?: string }) {
           { href: '/admin/members', label: 'Mitglieder',  icon: Users },
         ]
       : []),
+    ...(isSuperAdmin ? [{ href: '/super-admin', label: 'Super Admin', icon: Shield }] : []),
   ]
 
   const moreActive = moreItems.some(i =>
