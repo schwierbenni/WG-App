@@ -92,7 +92,11 @@ export async function POST(request: Request) {
       }
 
       wgId = token.wgId
-      role = 'MEMBER'
+
+      const existingAdmin = await prisma.user.findFirst({
+        where: { wgId: token.wgId, role: 'ADMIN' },
+      })
+      role = existingAdmin ? 'MEMBER' : 'ADMIN'
 
       await prisma.inviteToken.update({
         where: { token: inviteToken },
