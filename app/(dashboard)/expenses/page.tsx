@@ -24,6 +24,8 @@ import {
   X,
   Check,
   TrendingDown,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -554,6 +556,8 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [settlingSettlement, setSettlingSettlement] = React.useState<NetSettlement | null>(null)
+  const [expandedSettlements, setExpandedSettlements] = React.useState<Set<string>>(new Set())
+  const [settlingExpenseId, setSettlingExpenseId] = React.useState<string | null>(null)
 
   // Filters
   const [filterCategory, setFilterCategory] = React.useState<string>('all')
@@ -651,6 +655,43 @@ export default function ExpensesPage() {
       // ignore
     }
   }
+
+  const handleSettleExpense = async (expenseId: string) => {
+    setSettlingExpenseId(expenseId)
+    try {
+      await fetch(`/api/expenses/${expenseId}/settle`, { method: 'POST' })
+      fetchData()
+    } catch {
+      // ignore
+    } finally {
+      setSettlingExpenseId(null)
+    }
+  }
+
+  const toggleSettlementExpand = (key: string) => {
+    setExpandedSettlements((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // ── Helper: share of a given user in a given expense ──
+  const getShareForUser = (expense: Expense, userId: string): number => {
+    if (expense.splitMode === 'INDIVIDUAL') return expense.splits?.[userId] ?? 0
+    if (expense.splitMode === 'PERCENTAGE') return expense.amount * ((expense.splits?.[userId] ?? 0) / 100)
+    return expense.amount / expense.splitWith.length
+  }
+
+  // ── Helper: all unsettled expenses between two users ──
+  const getExpensesBetween = (userA: string, userB: string): Expense[] =>
+    expenses.filter(
+      (e) =>
+        e.settledAt === null &&
+        ((e.paidBy === userA && e.splitWith.includes(userB)) ||
+          (e.paidBy === userB && e.splitWith.includes(userA)))
+    )
 
   // Filtered expenses for history
   const filteredExpenses = React.useMemo(() => {
@@ -825,40 +866,104 @@ export default function ExpensesPage() {
             ) : (
               <div className="space-y-2">
                 {settlements.map((s) => {
+                  const key = `${s.fromUserId}-${s.toUserId}`
                   const isMyDebt = s.fromUserId === myId
                   const isOwedToMe = s.toUserId === myId
+                  const isExpanded = expandedSettlements.has(key)
+                  const pairExpenses = isExpanded ? getExpensesBetween(s.fromUserId, s.toUserId) : []
+
                   return (
-                    <div
-                      key={`${s.fromUserId}-${s.toUserId}`}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg border p-3',
-                        isMyDebt ? 'border-red-200 bg-red-50' : isOwedToMe ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-white'
+                    <div key={key} className={cn('rounded-lg border overflow-hidden', isMyDebt ? 'border-red-200' : isOwedToMe ? 'border-green-200' : 'border-gray-200')}>
+                      {/* Settlement header row */}
+                      <div className={cn('flex items-center gap-2 p-3', isMyDebt ? 'bg-red-50' : isOwedToMe ? 'bg-green-50' : 'bg-white')}>
+                        <button
+                          onClick={() => toggleSettlementExpand(key)}
+                          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                        >
+                          {isExpanded
+                            ? <ChevronUp className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                            : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+                          <span className={cn('text-sm font-medium truncate', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
+                            {isMyDebt ? 'Du' : s.fromUserName}
+                          </span>
+                          <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <span className={cn('text-sm font-medium truncate', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
+                            {isOwedToMe ? 'Dir' : s.toUserName}
+                          </span>
+                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={cn('font-semibold text-sm', isMyDebt ? 'text-red-600' : isOwedToMe ? 'text-green-600' : 'text-gray-700')}>
+                            {formatCurrency(s.amount)}
+                          </span>
+                          {(isMyDebt || isOwedToMe) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs px-2"
+                              onClick={() => setSettlingSettlement(s)}
+                            >
+                              Alles begleichen
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Expanded: individual expenses */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 divide-y divide-gray-100 bg-white">
+                          {pairExpenses.length === 0 ? (
+                            <p className="text-xs text-gray-400 px-4 py-3 text-center">Keine einzelnen Ausgaben gefunden</p>
+                          ) : (
+                            pairExpenses.map((exp) => {
+                              const expPaidByMe = exp.paidBy === myId
+                              const otherUserId = s.fromUserId === myId ? s.toUserId : s.fromUserId
+                              const otherUserName = s.fromUserId === myId ? s.toUserName : s.fromUserName
+                              const relevantUserId = exp.paidBy === s.toUserId ? s.fromUserId : s.toUserId
+                              const shareAmount = getShareForUser(exp, relevantUserId)
+                              const isSettling = settlingExpenseId === exp.id
+                              const isDeleting = deletingId === exp.id
+
+                              return (
+                                <div key={exp.id} className="flex items-center gap-3 px-4 py-2.5 group">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-gray-800 truncate">{exp.description}</p>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                      {exp.paidBy === myId ? 'Du hast bezahlt' : `${memberMap.get(exp.paidBy)?.name ?? exp.paidBy} hat bezahlt`}
+                                      {' · '}{formatDate(exp.date)}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs font-semibold text-gray-700 shrink-0">
+                                    {formatCurrency(shareAmount)}
+                                    <span className="text-gray-400 font-normal">
+                                      {exp.paidBy === s.toUserId
+                                        ? ` (${s.fromUserName === 'Du' || s.fromUserId === myId ? 'dein' : `${s.fromUserName}s`} Anteil)`
+                                        : ` (${s.toUserName === 'Dir' || s.toUserId === myId ? 'dein' : `${s.toUserName}s`} Anteil)`}
+                                    </span>
+                                  </span>
+                                  <div className="flex gap-1 shrink-0">
+                                    <button
+                                      onClick={() => handleSettleExpense(exp.id)}
+                                      disabled={isSettling || isDeleting}
+                                      className="p-1.5 rounded text-gray-300 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                                      title="Ausgabe als beglichen markieren"
+                                    >
+                                      <Check className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(exp.id)}
+                                      disabled={isDeleting || isSettling}
+                                      className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                      title="Ausgabe löschen"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
                       )}
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className={cn('text-sm font-medium truncate', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
-                          {isMyDebt ? 'Du' : s.fromUserName}
-                        </span>
-                        <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                        <span className={cn('text-sm font-medium truncate', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
-                          {isOwedToMe ? 'Dir' : s.toUserName}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={cn('font-semibold text-sm', isMyDebt ? 'text-red-600' : isOwedToMe ? 'text-green-600' : 'text-gray-700')}>
-                          {formatCurrency(s.amount)}
-                        </span>
-                        {isMyDebt && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs px-2"
-                            onClick={() => setSettlingSettlement(s)}
-                          >
-                            Begleichen
-                          </Button>
-                        )}
-                      </div>
                     </div>
                   )
                 })}
@@ -969,8 +1074,8 @@ export default function ExpensesPage() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {filteredExpenses.map((expense) => {
-                const canEdit = expense.paidBy === myId
-                const canDelete = expense.paidBy === myId
+                const canEdit = true
+                const canDelete = true
                 const isDeleting = deletingId === expense.id
                 const splitDetail = getExpenseSplitDetail(expense)
                 return (
