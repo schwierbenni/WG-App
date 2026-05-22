@@ -16,12 +16,13 @@ import {
   isPast,
 } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, CalendarPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+import { ICalImportDialog } from '@/components/ical-import-dialog'
 
 interface Assignment {
   id: string
@@ -36,6 +37,21 @@ interface Assignment {
     name: string
     emoji: string | null
     color: string
+  }
+}
+
+interface ICalEvent {
+  id: string
+  title: string
+  description: string | null
+  startDate: string
+  endDate: string | null
+  allDay: boolean
+  calendar: {
+    id: string
+    name: string
+    color: string
+    emoji: string
   }
 }
 
@@ -62,18 +78,27 @@ const DOT_COLORS: Record<AssignmentStatus, string> = {
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = React.useState(new Date())
   const [assignments, setAssignments] = React.useState<Assignment[]>([])
+  const [icalEvents, setIcalEvents] = React.useState<ICalEvent[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(null)
+  const [importOpen, setImportOpen] = React.useState(false)
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/assignments')
-      if (!res.ok) throw new Error('Fehler beim Laden der Zumweisungen')
-      const data = await res.json()
-      setAssignments(data.assignments ?? [])
+      const [assignRes, icalRes] = await Promise.all([
+        fetch('/api/assignments'),
+        fetch('/api/ical/events'),
+      ])
+      if (!assignRes.ok) throw new Error('Fehler beim Laden der Zumweisungen')
+      const assignData = await assignRes.json()
+      setAssignments(assignData.assignments ?? [])
+      if (icalRes.ok) {
+        const icalData = await icalRes.json()
+        setIcalEvents(icalData.events ?? [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -102,11 +127,37 @@ export default function CalendarPage() {
     return map
   }, [assignments])
 
+  const icalEventsByDay = React.useMemo(() => {
+    const map = new Map<string, ICalEvent[]>()
+    for (const e of icalEvents) {
+      const key = format(new Date(e.startDate), 'yyyy-MM-dd')
+      const existing = map.get(key) ?? []
+      existing.push(e)
+      map.set(key, existing)
+    }
+    return map
+  }, [icalEvents])
+
   const selectedDayAssignments = React.useMemo(() => {
     if (!selectedDay) return []
     const key = format(selectedDay, 'yyyy-MM-dd')
     return assignmentsByDay.get(key) ?? []
   }, [selectedDay, assignmentsByDay])
+
+  const selectedDayIcalEvents = React.useMemo(() => {
+    if (!selectedDay) return []
+    const key = format(selectedDay, 'yyyy-MM-dd')
+    return icalEventsByDay.get(key) ?? []
+  }, [selectedDay, icalEventsByDay])
+
+  // Collect unique calendars for the legend
+  const uniqueCalendars = React.useMemo(() => {
+    const seen = new Map<string, ICalEvent['calendar']>()
+    for (const e of icalEvents) {
+      if (!seen.has(e.calendar.id)) seen.set(e.calendar.id, e.calendar)
+    }
+    return Array.from(seen.values())
+  }, [icalEvents])
 
   const weekDays = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
@@ -117,10 +168,16 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-bold text-gray-900">Kalender</h1>
           <p className="text-sm text-gray-500 mt-1">Dienste und Fälligkeiten im Überblick</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          <span className="hidden sm:inline">Aktualisieren</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+            <CalendarPlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Kalender importieren</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            <span className="hidden sm:inline">Aktualisieren</span>
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -142,6 +199,12 @@ export default function CalendarPage() {
           <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
           <span className="text-gray-500">Überfällig</span>
         </div>
+        {uniqueCalendars.map((cal) => (
+          <div key={cal.id} className="flex items-center gap-1.5">
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: cal.color }} />
+            <span className="text-gray-500">{cal.emoji} {cal.name}</span>
+          </div>
+        ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -202,6 +265,7 @@ export default function CalendarPage() {
                 {calendarDays.map((day) => {
                   const key = format(day, 'yyyy-MM-dd')
                   const dayAssignments = assignmentsByDay.get(key) ?? []
+                  const dayIcalEvents = icalEventsByDay.get(key) ?? []
                   const isCurrentMonth = isSameMonth(day, currentMonth)
                   const isSelected = selectedDay ? isSameDay(day, selectedDay) : false
                   const today = isToday(day)
@@ -226,9 +290,9 @@ export default function CalendarPage() {
                         {format(day, 'd')}
                       </span>
 
-                      {dayAssignments.length > 0 && (
+                      {(dayAssignments.length > 0 || dayIcalEvents.length > 0) && (
                         <div className="flex flex-wrap gap-0.5 mt-0.5">
-                          {dayAssignments.slice(0, 3).map((a) => {
+                          {dayAssignments.slice(0, 2).map((a) => {
                             const status = getStatus(a)
                             return (
                               <div
@@ -238,8 +302,18 @@ export default function CalendarPage() {
                               />
                             )
                           })}
-                          {dayAssignments.length > 3 && (
-                            <span className="text-xs text-gray-400">+{dayAssignments.length - 3}</span>
+                          {dayIcalEvents.slice(0, 2).map((e) => (
+                            <div
+                              key={e.id}
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: e.calendar.color }}
+                              title={e.title}
+                            />
+                          ))}
+                          {(dayAssignments.length + dayIcalEvents.length) > 4 && (
+                            <span className="text-xs text-gray-400">
+                              +{dayAssignments.length + dayIcalEvents.length - 4}
+                            </span>
                           )}
                         </div>
                       )}
@@ -264,9 +338,9 @@ export default function CalendarPage() {
               <p className="text-sm text-gray-400 py-4 text-center">
                 Klicke auf einen Tag um Details zu sehen
               </p>
-            ) : selectedDayAssignments.length === 0 ? (
+            ) : selectedDayAssignments.length === 0 && selectedDayIcalEvents.length === 0 ? (
               <p className="text-sm text-gray-400 py-4 text-center">
-                Keine Dienste an diesem Tag
+                Keine Einträge an diesem Tag
               </p>
             ) : (
               <div className="space-y-2">
@@ -298,11 +372,39 @@ export default function CalendarPage() {
                     </div>
                   )
                 })}
+
+                {selectedDayIcalEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="rounded-lg border p-3 space-y-1"
+                    style={{
+                      backgroundColor: event.calendar.color + '18',
+                      borderColor: event.calendar.color + '44',
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base leading-none">{event.calendar.emoji}</span>
+                      <span className="text-sm font-semibold" style={{ color: event.calendar.color }}>
+                        {event.title}
+                      </span>
+                    </div>
+                    {event.description && (
+                      <p className="text-xs text-gray-500 line-clamp-2">{event.description}</p>
+                    )}
+                    <p className="text-xs text-gray-400">{event.calendar.name}</p>
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      <ICalImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={fetchData}
+      />
     </div>
   )
 }

@@ -23,6 +23,7 @@ model WGConfig {
   notifications    Notification[]
   inviteTokens     InviteToken[]
   spotifyPlaylists SpotifyPlaylist[]
+  icalCalendars    ICalCalendar[]
 }
 
 model User {
@@ -229,6 +230,7 @@ enum NotificationType {
   SWAP_REQUEST
   REMINDER
   ANNOUNCEMENT
+  ICAL_REMINDER
 }
 
 model PasswordResetToken {
@@ -273,4 +275,33 @@ model SpotifyPlaylist {
 
   user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   wg   WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+}
+
+model ICalCalendar {
+  id        String   @id @default(cuid())
+  wgId      String
+  name      String
+  color     String   @default("#6366f1")
+  emoji     String   @default("📅")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  wg     WGConfig    @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  events ICalEvent[]
+}
+
+model ICalEvent {
+  id          String    @id @default(cuid())
+  calendarId  String
+  wgId        String
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  allDay      Boolean   @default(false)
+  uid         String
+
+  calendar ICalCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, uid])
 }
