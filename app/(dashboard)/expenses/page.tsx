@@ -944,7 +944,7 @@ export default function ExpensesPage() {
                                     <button
                                       onClick={() => handleSettleExpense(exp.id)}
                                       disabled={isSettling || isDeleting}
-                                      className="p-1.5 rounded text-gray-300 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-50"
+                                      className="p-1.5 rounded text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50"
                                       title="Ausgabe als beglichen markieren"
                                     >
                                       <Check className="h-3.5 w-3.5" />
@@ -952,7 +952,7 @@ export default function ExpensesPage() {
                                     <button
                                       onClick={() => handleDelete(exp.id)}
                                       disabled={isDeleting || isSettling}
-                                      className="p-1.5 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                                      className="p-1.5 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                                       title="Ausgabe löschen"
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -1010,7 +1010,7 @@ export default function ExpensesPage() {
                 <Receipt className="h-5 w-5 text-indigo-500" />
                 Ausgaben-Historie
               </CardTitle>
-              <CardDescription>{filteredExpenses.length} von {expenses.length} Ausgaben</CardDescription>
+              <CardDescription>Alle WG-Ausgaben · {filteredExpenses.length} von {expenses.length} angezeigt</CardDescription>
             </div>
           </div>
 
@@ -1077,9 +1077,10 @@ export default function ExpensesPage() {
                 const canEdit = true
                 const canDelete = true
                 const isDeleting = deletingId === expense.id
+                const isSettled = !!expense.settledAt
                 const splitDetail = getExpenseSplitDetail(expense)
                 return (
-                  <li key={expense.id} className="flex items-start gap-3 px-6 py-3 group hover:bg-gray-50">
+                  <li key={expense.id} className={cn('flex items-start gap-3 px-6 py-3 group hover:bg-gray-50', isSettled && 'opacity-60')}>
                     <Avatar className="h-8 w-8 shrink-0 mt-0.5">
                       {expense.paidByUser.avatarUrl && (
                         <AvatarImage src={expense.paidByUser.avatarUrl} alt={expense.paidByUser.name} />
@@ -1094,6 +1095,11 @@ export default function ExpensesPage() {
                         <span className="text-xs text-gray-400">{expense.paidByUser.name} bezahlt</span>
                         <Separator orientation="vertical" className="h-3" />
                         <span className="text-xs text-gray-400">{formatDate(expense.date)}</span>
+                        {isSettled && (
+                          <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                            ✓ Beglichen
+                          </span>
+                        )}
                       </div>
                       {splitDetail && (
                         <p className="text-xs text-gray-400 mt-0.5 truncate">
@@ -1102,17 +1108,18 @@ export default function ExpensesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge className={CATEGORY_COLORS[expense.category]} variant="outline">
+                      <Badge className={cn(CATEGORY_COLORS[expense.category], 'hidden sm:inline-flex')} variant="outline">
                         {CATEGORY_LABELS[expense.category]}
                       </Badge>
                       <span className="font-semibold text-sm text-gray-900 ml-1">
                         {formatCurrency(expense.amount)}
                       </span>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Buttons: always visible on mobile, fade-in on desktop hover */}
+                      <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         {canEdit && (
                           <button
                             onClick={() => setEditingExpense(expense)}
-                            className="p-1.5 rounded-lg text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                            className="p-1.5 rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
                             title="Ausgabe bearbeiten"
                           >
                             <Edit2 className="h-3.5 w-3.5" />
@@ -1122,7 +1129,7 @@ export default function ExpensesPage() {
                           <button
                             onClick={() => handleDelete(expense.id)}
                             disabled={isDeleting}
-                            className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                             title="Ausgabe löschen"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
