@@ -36,9 +36,7 @@ export function PushNotificationToggle() {
     }
     if (!('PushManager' in window)) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      const isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (navigator as Navigator & { standalone?: boolean }).standalone === true
+      const isStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
       setState(isIOS && !isStandalone ? 'ios-browser' : 'unsupported')
       return
     }
@@ -143,7 +141,7 @@ export function PushNotificationToggle() {
             )}
           />
         </button>
-        <span className="text-[10px] text-gray-400">{toggling ? '…' : STATE_LABELS[state]}</span>
+        <span className="text-[10px] text-gray-400">{toggling ? '…' : STATE_LABELS[state as PushState]}</span>
       </div>
     </div>
   )

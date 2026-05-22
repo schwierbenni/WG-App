@@ -27,9 +27,7 @@ export function PushNotificationPrompt() {
 
     if (!('PushManager' in window)) {
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      const isStandalone =
-        window.matchMedia('(display-mode: standalone)').matches ||
-        (navigator as Navigator & { standalone?: boolean }).standalone === true
+      const isStandalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
       if (isIOS && !isStandalone && !localStorage.getItem(IOS_STORAGE_KEY)) {
         setIsIOSBrowser(true)
         const timer = setTimeout(() => setVisible(true), 3000)
