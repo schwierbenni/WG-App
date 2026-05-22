@@ -1,12 +1,73 @@
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 
-interface Settlement {
+interface NetSettlement {
   fromUserId: string
   fromUserName: string
   toUserId: string
   toUserName: string
   amount: number
+}
+
+function computeShareForExpense(
+  expense: { amount: number; splitWith: string[]; splitMode: string; splits: unknown },
+  userId: string
+): number {
+  if (expense.splitMode === 'INDIVIDUAL') {
+    const s = expense.splits as Record<string, number> | null
+    return s?.[userId] ?? 0
+  }
+  if (expense.splitMode === 'PERCENTAGE') {
+    const s = expense.splits as Record<string, number> | null
+    return expense.amount * ((s?.[userId] ?? 0) / 100)
+  }
+  // EQUAL
+  return expense.amount / expense.splitWith.length
+}
+
+function greedySettlements(
+  balances: Map<string, number>,
+  userMap: Map<string, string>
+): NetSettlement[] {
+  const creditors: [string, number][] = []
+  const debtors: [string, number][] = []
+
+  for (const [userId, balance] of balances) {
+    const rounded = Math.round(balance * 100) / 100
+    if (rounded > 0.01) creditors.push([userId, rounded])
+    else if (rounded < -0.01) debtors.push([userId, -rounded])
+  }
+
+  creditors.sort((a, b) => b[1] - a[1])
+  debtors.sort((a, b) => b[1] - a[1])
+
+  const settlements: NetSettlement[] = []
+  let i = 0
+  let j = 0
+
+  while (i < creditors.length && j < debtors.length) {
+    const [creditorId, creditorAmt] = creditors[i]
+    const [debtorId, debtorAmt] = debtors[j]
+    const amount = Math.round(Math.min(creditorAmt, debtorAmt) * 100) / 100
+
+    if (amount >= 0.01) {
+      settlements.push({
+        fromUserId: debtorId,
+        fromUserName: userMap.get(debtorId) ?? debtorId,
+        toUserId: creditorId,
+        toUserName: userMap.get(creditorId) ?? creditorId,
+        amount,
+      })
+    }
+
+    creditors[i] = [creditorId, Math.round((creditorAmt - amount) * 100) / 100]
+    debtors[j] = [debtorId, Math.round((debtorAmt - amount) * 100) / 100]
+
+    if (creditors[i][1] < 0.01) i++
+    if (debtors[j][1] < 0.01) j++
+  }
+
+  return settlements
 }
 
 export async function GET() {
@@ -17,57 +78,42 @@ export async function GET() {
   try {
     const expenses = await prisma.expense.findMany({
       where: { wgId, settledAt: null },
-      include: { paidByUser: { select: { id: true, name: true } } },
+      select: { paidBy: true, splitWith: true, amount: true, splitMode: true, splits: true },
     })
 
     const allUserIds = new Set<string>()
-    for (const expense of expenses) {
-      allUserIds.add(expense.paidBy)
-      for (const userId of expense.splitWith) allUserIds.add(userId)
+    for (const e of expenses) {
+      allUserIds.add(e.paidBy)
+      for (const uid of e.splitWith) allUserIds.add(uid)
     }
 
     const users = await prisma.user.findMany({
       where: { id: { in: Array.from(allUserIds) }, wgId },
       select: { id: true, name: true },
     })
-    const userMap = new Map<string, string>(users.map((u) => [u.id, u.name] as [string, string]))
+    const userMap = new Map<string, string>(users.map((u) => [u.id, u.name]))
 
-    const net: Record<string, Record<string, number>> = {}
-
-    for (const expense of expenses) {
-      const { paidBy, splitWith, amount } = expense
-      const share = amount / splitWith.length
-
-      for (const userId of splitWith) {
-        if (userId === paidBy) continue
-        if (!net[paidBy]) net[paidBy] = {}
-        if (!net[userId]) net[userId] = {}
-        net[paidBy][userId] = (net[paidBy][userId] ?? 0) + share
-        net[userId][paidBy] = (net[userId][paidBy] ?? 0) - share
+    // Compute net balance per person: positive = is owed money, negative = owes money
+    const balances = new Map<string, number>()
+    for (const e of expenses) {
+      // Payer gets credited the full amount
+      balances.set(e.paidBy, (balances.get(e.paidBy) ?? 0) + e.amount)
+      // Each participant is debited their share
+      for (const uid of e.splitWith) {
+        const share = computeShareForExpense(e, uid)
+        balances.set(uid, (balances.get(uid) ?? 0) - share)
       }
     }
 
-    const settlements: Settlement[] = []
-    const processed = new Set<string>()
+    const settlements = greedySettlements(balances, userMap)
 
-    for (const [creditor, debtors] of Object.entries(net)) {
-      for (const [debtor] of Object.entries(debtors)) {
-        const key = [creditor, debtor].sort().join('_')
-        if (processed.has(key)) continue
-        processed.add(key)
-
-        const netAmount = (net[creditor]?.[debtor] ?? 0) - (net[debtor]?.[creditor] ?? 0)
-        if (Math.abs(netAmount) < 0.01) continue
-
-        if (netAmount > 0) {
-          settlements.push({ fromUserId: debtor, fromUserName: userMap.get(debtor) ?? debtor, toUserId: creditor, toUserName: userMap.get(creditor) ?? creditor, amount: Math.round(netAmount * 100) / 100 })
-        } else {
-          settlements.push({ fromUserId: creditor, fromUserName: userMap.get(creditor) ?? creditor, toUserId: debtor, toUserName: userMap.get(debtor) ?? debtor, amount: Math.round(Math.abs(netAmount) * 100) / 100 })
-        }
-      }
+    // Per-person breakdown: how much each user owes/is owed
+    const personBreakdown: Record<string, number> = {}
+    for (const [uid, balance] of balances) {
+      personBreakdown[uid] = Math.round(balance * 100) / 100
     }
 
-    return Response.json({ settlements })
+    return Response.json({ settlements, personBreakdown })
   } catch (error) {
     console.error('GET settlements error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
@@ -80,10 +126,19 @@ export async function POST(req: Request) {
   const { wgId } = auth
 
   try {
-    const { fromUserId, toUserId } = await req.json()
-    if (!fromUserId || !toUserId) {
-      return Response.json({ error: 'fromUserId und toUserId erforderlich' }, { status: 400 })
+    const { fromUserId, toUserId, amount, comment } = await req.json()
+    if (!fromUserId || !toUserId || typeof amount !== 'number') {
+      return Response.json({ error: 'fromUserId, toUserId und amount erforderlich' }, { status: 400 })
     }
+
+    // Create settlement record for history
+    const settlement = await prisma.settlement.create({
+      data: { wgId, fromUserId, toUserId, amount, comment: comment || null },
+      include: {
+        fromUser: { select: { id: true, name: true } },
+        toUser: { select: { id: true, name: true } },
+      },
+    })
 
     // Mark all unsettled expenses between these two users as settled
     await prisma.expense.updateMany({
@@ -98,7 +153,7 @@ export async function POST(req: Request) {
       data: { settledAt: new Date() },
     })
 
-    return Response.json({ ok: true })
+    return Response.json({ ok: true, settlement })
   } catch (error) {
     console.error('POST settlements error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

@@ -7,8 +7,9 @@ import { AssignmentOverview } from '@/components/dashboard/assignment-overview'
 import { formatDate } from '@/lib/utils'
 import {
   ClipboardList, Megaphone, ArrowLeftRight, AlertCircle,
-  User, ShoppingCart, Wallet, Calendar,
+  User, ShoppingCart, Wallet, Calendar, Receipt,
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
 interface SimpleUser {
   id: string
@@ -64,6 +65,14 @@ interface Expense {
   splitWith: string[]
   date: string
   paidByUser: SimpleUser
+}
+
+interface NetSettlement {
+  fromUserId: string
+  fromUserName: string
+  toUserId: string
+  toUserName: string
+  amount: number
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
@@ -131,6 +140,15 @@ async function fetchExpenses(cookie: string): Promise<Expense[]> {
   } catch { return [] }
 }
 
+async function fetchSettlements(cookie: string): Promise<NetSettlement[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/expenses/settlements`, { headers: { cookie }, cache: 'no-store' })
+    if (!res.ok) return []
+    const data = await res.json()
+    return data.settlements ?? []
+  } catch { return [] }
+}
+
 function splitAssignments(assignments: DutyAssignment[]) {
   const now = new Date()
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -149,14 +167,10 @@ function splitAssignments(assignments: DutyAssignment[]) {
   return { overdue, thisWeek, later, done }
 }
 
-function computeMyBalance(expenses: Expense[], userId: string): number {
-  let balance = 0
-  for (const e of expenses) {
-    const share = e.amount / e.splitWith.length
-    if (e.paidBy === userId) balance += e.amount - share
-    else if (e.splitWith.includes(userId)) balance -= share
-  }
-  return balance
+function computeMyBalance(settlements: NetSettlement[], userId: string): { iOwe: number; owedToMe: number } {
+  const iOwe = settlements.filter((s) => s.fromUserId === userId).reduce((s, x) => s + x.amount, 0)
+  const owedToMe = settlements.filter((s) => s.toUserId === userId).reduce((s, x) => s + x.amount, 0)
+  return { iOwe, owedToMe }
 }
 
 function SectionHeader({
@@ -206,7 +220,7 @@ export default async function DashboardPage() {
 
   const [
     myAssignments, allAssignments, announcements,
-    swapRequests, members, shoppingItems, expenses,
+    swapRequests, members, shoppingItems, expenses, debtSettlements,
   ] = await Promise.all([
     fetchMyAssignments(cookieHeader),
     fetchAllAssignments(cookieHeader),
@@ -215,13 +229,15 @@ export default async function DashboardPage() {
     fetchMembers(cookieHeader),
     fetchShoppingItems(cookieHeader),
     fetchExpenses(cookieHeader),
+    fetchSettlements(cookieHeader),
   ])
 
   const { overdue, thisWeek, later } = splitAssignments(myAssignments)
   const pendingMyAssignments = [...overdue, ...thisWeek, ...later]
 
   const openShoppingItems = shoppingItems.filter((i) => !i.boughtAt).length
-  const myBalance = computeMyBalance(expenses, session.user.id)
+  const { iOwe, owedToMe } = computeMyBalance(debtSettlements, session.user.id)
+  const myBalance = owedToMe - iOwe
 
   const upcomingAll = allAssignments
     .filter((a) => !a.completedAt && new Date(a.dueDate) >= new Date())
@@ -305,27 +321,43 @@ export default async function DashboardPage() {
 
         <Link
           href="/expenses"
-          className="group flex items-center gap-4 rounded-2xl border-2 border-surface-border bg-surface p-4 shadow-sm hover:border-brand-600 hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+          className="group flex flex-col gap-2 rounded-2xl border-2 border-surface-border bg-surface p-4 shadow-sm hover:border-brand-600 hover:shadow-md transition-all duration-200 active:scale-[0.98]"
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--info-bg)] shrink-0">
-            <Wallet className="h-5 w-5 text-[var(--info)]" />
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--info-bg)] shrink-0">
+              <Wallet className="h-5 w-5 text-[var(--info)]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-foreground" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
+                WG-Kasse
+              </p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                {myBalance === 0
+                  ? 'Alles ausgeglichen'
+                  : myBalance > 0
+                    ? `Du bekommst ${myBalance.toFixed(2)} €`
+                    : `Du schuldest ${Math.abs(myBalance).toFixed(2)} €`}
+              </p>
+            </div>
+            {myBalance !== 0 && (
+              <span className={`text-sm font-extrabold shrink-0 ${myBalance > 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
+                {myBalance > 0 ? '+' : ''}{myBalance.toFixed(2)} €
+              </span>
+            )}
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-foreground" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
-              WG-Kasse
-            </p>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
-              {myBalance === 0
-                ? 'Alles ausgeglichen'
-                : myBalance > 0
-                  ? `Du bekommst ${myBalance.toFixed(2)} €`
-                  : `Du schuldest ${Math.abs(myBalance).toFixed(2)} €`}
-            </p>
-          </div>
-          {myBalance !== 0 && (
-            <span className={`ml-auto text-sm font-extrabold shrink-0 ${myBalance > 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
-              {myBalance > 0 ? '+' : ''}{myBalance.toFixed(2)} €
-            </span>
+          {debtSettlements.length > 0 && (
+            <div className="space-y-1 mt-1">
+              {debtSettlements.filter((s) => s.fromUserId === userId || s.toUserId === userId).slice(0, 3).map((s) => {
+                const isMyDebt = s.fromUserId === userId
+                return (
+                  <p key={`${s.fromUserId}-${s.toUserId}`} className={`text-xs ${isMyDebt ? 'text-[var(--danger)]' : 'text-[var(--success)]'}`}>
+                    {isMyDebt
+                      ? `Du schuldest ${s.toUserName} ${s.amount.toFixed(2)} €`
+                      : `${s.fromUserName} schuldet dir ${s.amount.toFixed(2)} €`}
+                  </p>
+                )
+              })}
+            </div>
           )}
         </Link>
       </div>
@@ -447,8 +479,38 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        {/* Right: Announcements */}
+        {/* Right: Announcements + Recent Expenses */}
         <div className="space-y-6">
+          {/* Recent expenses */}
+          {expenses.length > 0 && (
+            <section>
+              <SectionHeader icon={Receipt} title="Letzte Ausgaben" />
+              <div className="rounded-2xl border-2 border-surface-border bg-surface overflow-hidden shadow-sm divide-y divide-surface-border">
+                {expenses.slice(0, 5).map((e) => {
+                  const isMyPayment = e.paidBy === userId
+                  return (
+                    <div key={e.id} className="flex items-center gap-3 px-4 py-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">{e.description}</p>
+                        <p className="text-xs text-[var(--text-muted)]">
+                          {isMyPayment ? 'Du' : e.paidByUser.name} · {formatDate(e.date)}
+                        </p>
+                      </div>
+                      <span className={`text-sm font-bold shrink-0 ${isMyPayment ? 'text-brand-600' : 'text-foreground'}`}>
+                        {formatCurrency(e.amount)}
+                      </span>
+                    </div>
+                  )
+                })}
+                <div className="px-4 py-2.5">
+                  <Link href="/expenses" className="text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors">
+                    Alle Ausgaben ansehen →
+                  </Link>
+                </div>
+              </div>
+            </section>
+          )}
+
           <section>
             <SectionHeader icon={Megaphone} title="Ankündigungen" count={announcements.length} />
 
