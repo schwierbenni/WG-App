@@ -883,10 +883,18 @@ export default function ExpensesPage() {
                           {isExpanded
                             ? <ChevronUp className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                             : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+                          <Avatar className="h-6 w-6 shrink-0">
+                            {memberMap.get(s.fromUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.fromUserId)!.avatarUrl!} alt={s.fromUserName} />}
+                            <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.fromUserName)}</AvatarFallback>
+                          </Avatar>
                           <span className={cn('text-sm font-medium truncate', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
                             {isMyDebt ? 'Du' : s.fromUserName}
                           </span>
                           <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <Avatar className="h-6 w-6 shrink-0">
+                            {memberMap.get(s.toUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.toUserId)!.avatarUrl!} alt={s.toUserName} />}
+                            <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.toUserName)}</AvatarFallback>
+                          </Avatar>
                           <span className={cn('text-sm font-medium truncate', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
                             {isOwedToMe ? 'Dir' : s.toUserName}
                           </span>
@@ -1162,15 +1170,16 @@ export default function ExpensesPage() {
                 const isReceivedByMe = s.toUserId === myId
                 return (
                   <li key={s.id} className="flex items-center gap-3 px-6 py-3">
-                    <div className={cn(
-                      'flex h-8 w-8 items-center justify-center rounded-full shrink-0',
-                      isMyPayment ? 'bg-red-50' : isReceivedByMe ? 'bg-green-50' : 'bg-gray-50'
-                    )}>
-                      {isMyPayment ? (
-                        <TrendingDown className="h-4 w-4 text-red-500" />
-                      ) : (
-                        <Check className="h-4 w-4 text-green-500" />
-                      )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Avatar className="h-7 w-7">
+                        {s.fromUser.avatarUrl && <AvatarImage src={s.fromUser.avatarUrl} alt={s.fromUser.name} />}
+                        <AvatarFallback className="text-[9px] bg-indigo-100 text-indigo-700">{getInitials(s.fromUser.name)}</AvatarFallback>
+                      </Avatar>
+                      <ArrowRight className="h-3 w-3 text-gray-300 shrink-0" />
+                      <Avatar className="h-7 w-7">
+                        {s.toUser.avatarUrl && <AvatarImage src={s.toUser.avatarUrl} alt={s.toUser.name} />}
+                        <AvatarFallback className="text-[9px] bg-indigo-100 text-indigo-700">{getInitials(s.toUser.name)}</AvatarFallback>
+                      </Avatar>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">
