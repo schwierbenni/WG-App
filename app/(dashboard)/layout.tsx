@@ -16,9 +16,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const wgId = (session.user as { wgId?: string }).wgId
 
   let wgName = 'Meine WG'
+  let wgAvatarUrl: string | null = null
   if (wgId) {
-    const wgConfig = await prisma.wGConfig.findUnique({ where: { id: wgId }, select: { name: true } })
-    if (wgConfig) wgName = wgConfig.name
+    const wgConfig = await prisma.wGConfig.findUnique({ where: { id: wgId }, select: { name: true, avatarUrl: true } })
+    if (wgConfig) {
+      wgName = wgConfig.name
+      wgAvatarUrl = wgConfig.avatarUrl
+    }
   }
 
   return (
@@ -30,6 +34,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userEmail={email ?? undefined}
         userAvatar={image ?? undefined}
         wgName={wgName}
+        wgAvatarUrl={wgAvatarUrl}
       />
 
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
@@ -38,6 +43,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           userEmail={email}
           userAvatar={image ?? undefined}
           wgName={wgName}
+          wgAvatarUrl={wgAvatarUrl}
         />
 
         {/* Main content — extra bottom padding on mobile for the bottom nav */}

@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   Settings, Plus, Link as LinkIcon, Copy, Check, Save,
-  RefreshCw, Users, Pencil, X,
+  RefreshCw, Users, Pencil, X, Upload,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { cn } from '@/lib/utils'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { cn, getInitials } from '@/lib/utils'
 
 const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL ?? 'schwier.b@gmail.com'
 
@@ -133,6 +134,7 @@ function WgCard({
 function OwnWgSettings({ currentWgId }: { currentWgId: string }) {
   const [wgName, setWgName] = React.useState('')
   const [nameInput, setNameInput] = React.useState('')
+  const [wgAvatarUrl, setWgAvatarUrl] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
   const [saveSuccess, setSaveSuccess] = React.useState(false)
   const [saveError, setSaveError] = React.useState('')
@@ -140,6 +142,9 @@ function OwnWgSettings({ currentWgId }: { currentWgId: string }) {
   const [generating, setGenerating] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
   const [loading, setLoading] = React.useState(true)
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState('')
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     fetch('/api/wg')
@@ -147,10 +152,38 @@ function OwnWgSettings({ currentWgId }: { currentWgId: string }) {
       .then((data) => {
         setWgName(data.wg?.name ?? '')
         setNameInput(data.wg?.name ?? '')
+        setWgAvatarUrl(data.wg?.avatarUrl ?? null)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    setUploadError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/upload/wg-avatar', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) setUploadError(data.error ?? 'Upload fehlgeschlagen.')
+      else setWgAvatarUrl(data.avatarUrl)
+    } catch {
+      setUploadError('Netzwerkfehler beim Upload.')
+    } finally {
+      setUploadingAvatar(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleRemoveAvatar() {
+    try {
+      await fetch('/api/upload/wg-avatar', { method: 'DELETE' })
+      setWgAvatarUrl(null)
+    } catch { /* ignore */ }
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -192,6 +225,78 @@ function OwnWgSettings({ currentWgId }: { currentWgId: string }) {
 
   return (
     <div className="space-y-6">
+      {/* WG Avatar */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Upload className="h-4 w-4 text-indigo-500" />
+            WG-Profilbild
+          </CardTitle>
+          <CardDescription>Wird in der Sidebar und im mobilen Header angezeigt.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-5">
+            <div className="relative shrink-0">
+              {wgAvatarUrl ? (
+                <Avatar className="h-20 w-20 ring-2 ring-indigo-200">
+                  <AvatarImage src={wgAvatarUrl} alt={wgName} className="object-cover" />
+                  <AvatarFallback className="text-xl font-bold bg-indigo-100 text-indigo-700">
+                    {getInitials(wgName)}
+                  </AvatarFallback>
+                </Avatar>
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-100 ring-2 ring-indigo-200">
+                  <span className="text-2xl font-extrabold text-indigo-600">
+                    {getInitials(wgName || 'WG')}
+                  </span>
+                </div>
+              )}
+              {uploadingAvatar && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
+                  <span className="h-5 w-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2.5">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleAvatarUpload}
+                disabled={uploadingAvatar}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={uploadingAvatar}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {uploadingAvatar ? 'Wird hochgeladen…' : 'Bild hochladen'}
+              </Button>
+              {wgAvatarUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 block"
+                  onClick={handleRemoveAvatar}
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Bild entfernen
+                </Button>
+              )}
+              <p className="text-xs text-gray-400">JPEG, PNG, WebP oder GIF · max. 2 MB</p>
+              {uploadError && (
+                <p className="text-xs text-red-600 bg-red-50 rounded p-1.5">{uploadError}</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Rename */}
       <Card>
         <CardHeader>
