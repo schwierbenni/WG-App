@@ -110,9 +110,7 @@ export async function DELETE(
     if (!expense || expense.wgId !== wgId) {
       return Response.json({ error: 'Nicht gefunden' }, { status: 404 })
     }
-    if (expense.paidBy !== session.user.id && session.user.role !== 'ADMIN') {
-      return Response.json({ error: 'Nur der Zahler oder ein Admin kann löschen' }, { status: 403 })
-    }
+    // Any WG member can delete WG expenses
 
     await prisma.expense.delete({ where: { id } })
     return new Response(null, { status: 204 })
