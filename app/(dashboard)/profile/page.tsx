@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { User, Bell, Trash2, KeyRound, Save, AlertTriangle } from 'lucide-react'
+import { User, Bell, Trash2, KeyRound, Save, AlertTriangle, Upload, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -44,6 +44,10 @@ export default function ProfilePage() {
   const [saveError, setSaveError] = React.useState('')
   const [saveSuccess, setSaveSuccess] = React.useState(false)
 
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState('')
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
   const [showDeleteDialog, setShowDeleteDialog] = React.useState(false)
   const [deleteConfirm, setDeleteConfirm] = React.useState('')
   const [deleting, setDeleting] = React.useState(false)
@@ -79,6 +83,49 @@ export default function ProfilePage() {
   React.useEffect(() => {
     fetchProfile()
   }, [fetchProfile])
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    setUploadError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch('/api/upload/avatar', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) {
+        setUploadError(data.error ?? 'Upload fehlgeschlagen.')
+      } else {
+        setAvatarUrl(data.avatarUrl)
+        setProfile((p) => p ? { ...p, avatarUrl: data.avatarUrl } : p)
+        await updateSession({ image: data.avatarUrl })
+      }
+    } catch {
+      setUploadError('Netzwerkfehler beim Upload.')
+    } finally {
+      setUploadingAvatar(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleRemoveAvatar = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/users/${profile!.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ avatarUrl: null }),
+      })
+      if (res.ok) {
+        setAvatarUrl('')
+        setProfile((p) => p ? { ...p, avatarUrl: null } : p)
+        await updateSession({ image: null })
+      }
+    } catch { /* ignore */ } finally {
+      setSaving(false)
+    }
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -258,23 +305,59 @@ export default function ProfilePage() {
                 disabled={saving}
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="profile-avatar">Avatar-URL (optional)</Label>
-              <Input
-                id="profile-avatar"
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://..."
-                disabled={saving}
-              />
-              {avatarUrl && (
-                <div className="mt-2">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={avatarUrl} alt="Vorschau" />
-                    <AvatarFallback className="text-xs">?</AvatarFallback>
+            <div className="space-y-2">
+              <Label>Profilbild</Label>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Avatar className="h-16 w-16">
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt="Vorschau" />}
+                    <AvatarFallback className="text-lg bg-indigo-100 text-indigo-700">
+                      {getInitials(name || profile.name)}
+                    </AvatarFallback>
                   </Avatar>
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                      <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    </div>
+                  )}
                 </div>
+                <div className="space-y-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={uploadingAvatar || saving}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={uploadingAvatar || saving}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    {uploadingAvatar ? 'Wird hochgeladen…' : 'Bild hochladen'}
+                  </Button>
+                  {avatarUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      disabled={saving}
+                      onClick={handleRemoveAvatar}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Bild entfernen
+                    </Button>
+                  )}
+                  <p className="text-xs text-gray-400">JPEG, PNG, WebP oder GIF · max. 2 MB</p>
+                </div>
+              </div>
+              {uploadError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded p-2">{uploadError}</p>
               )}
             </div>
 

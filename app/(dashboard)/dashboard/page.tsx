@@ -8,8 +8,9 @@ import { AssignmentOverview } from '@/components/dashboard/assignment-overview'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import {
   ClipboardList, Megaphone, ArrowLeftRight, AlertCircle,
-  User, ShoppingCart, Wallet, Calendar, Receipt,
+  ShoppingCart, Wallet, Calendar, Receipt,
 } from 'lucide-react'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 // ─── settlement helper (mirrors /api/expenses/settlements) ───────────────────
 
@@ -277,6 +278,20 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      {/* ── WG Members ── */}
+      {members.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap">
+          {members.map((m) => (
+            <div key={m.id} className="flex flex-col items-center gap-1.5">
+              <UserAvatar name={m.name} avatarUrl={m.avatarUrl} size="lg" />
+              <span className="text-[11px] text-[var(--text-muted)] font-medium max-w-[56px] truncate text-center">
+                {m.id === userId ? 'Du' : m.name.split(' ')[0]}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Quick-access: Shopping + Expenses ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Link
@@ -355,6 +370,7 @@ export default async function DashboardPage() {
                     href={`/duties?swap=${req.id}`}
                     className="block text-xs text-brand-600 opacity-80 hover:opacity-100 transition-opacity"
                   >
+                    <UserAvatar name={req.fromUser.name} avatarUrl={req.fromUser.avatarUrl} size="xs" className="inline-flex mr-1 align-middle" />
                     <span className="font-semibold">{req.fromUser.name}</span> möchte{' '}
                     {req.assignment.duty.emoji && <span className="mr-0.5">{req.assignment.duty.emoji}</span>}
                     <span className="font-semibold">{req.assignment.duty.name}</span> tauschen
@@ -459,7 +475,10 @@ export default async function DashboardPage() {
                           {a.duty.name}
                           {isMe && <span className="ml-2 text-xs font-normal text-brand-600">(du)</span>}
                         </p>
-                        <p className="text-xs text-[var(--text-muted)]">{a.user.name}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <UserAvatar name={a.user.name} avatarUrl={a.user.avatarUrl} size="xs" />
+                          <p className="text-xs text-[var(--text-muted)]">{isMe ? 'Du' : a.user.name}</p>
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-xs font-semibold text-foreground">{formatDate(a.dueDate)}</p>
@@ -487,6 +506,7 @@ export default async function DashboardPage() {
                   const isMyPayment = e.paidBy === userId
                   return (
                     <div key={e.id} className="flex items-center gap-3 px-4 py-3">
+                      <UserAvatar name={e.paidByUser.name} avatarUrl={e.paidByUser.avatarUrl} size="xs" className="shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-foreground truncate">{e.description}</p>
                         <p className="text-xs text-[var(--text-muted)]">
@@ -522,9 +542,7 @@ export default async function DashboardPage() {
                     className="rounded-2xl border-2 border-surface-border bg-surface p-4 shadow-sm hover:border-brand-600 transition-colors"
                   >
                     <div className="flex items-center gap-2.5 mb-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-muted shrink-0">
-                        <User className="h-3.5 w-3.5 text-brand-600" />
-                      </div>
+                      <UserAvatar name={a.author.name} avatarUrl={a.author.avatarUrl} size="sm" className="shrink-0" />
                       <div>
                         <p className="text-xs font-bold text-foreground" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
                           {a.author.name}
