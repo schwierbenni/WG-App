@@ -21,6 +21,7 @@ const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL ?? 'schwier.
 interface WgItem {
   id: string
   name: string
+  avatarUrl?: string | null
   createdAt: string
   _count: { members: number }
 }
@@ -30,9 +31,11 @@ function WgCard({
   wg,
   isCurrentWg,
   onRenamed,
+  onAvatarChanged,
 }: {
   wg: WgItem
   isCurrentWg: boolean
+  onAvatarChanged: (id: string, avatarUrl: string | null) => void
   onRenamed: (id: string, name: string) => void
 }) {
   const [editing, setEditing] = React.useState(false)
@@ -42,6 +45,10 @@ function WgCard({
   const [inviteLink, setInviteLink] = React.useState('')
   const [generating, setGenerating] = React.useState(false)
   const [copied, setCopied] = React.useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false)
+  const [uploadError, setUploadError] = React.useState('')
+  const [localAvatarUrl, setLocalAvatarUrl] = React.useState<string | null>(wg.avatarUrl ?? null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   async function handleSave() {
     if (!nameInput.trim() || nameInput.trim() === wg.name) { setEditing(false); return }
@@ -72,10 +79,70 @@ function WgCard({
     catch { /* ignore */ }
   }
 
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true); setUploadError('')
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('wgId', wg.id)
+      const res = await fetch('/api/upload/wg-avatar', { method: 'POST', body: form })
+      const data = await res.json()
+      if (!res.ok) setUploadError(data.error ?? 'Upload fehlgeschlagen.')
+      else { setLocalAvatarUrl(data.avatarUrl); onAvatarChanged(wg.id, data.avatarUrl) }
+    } catch { setUploadError('Netzwerkfehler.') }
+    finally { setUploadingAvatar(false); if (fileInputRef.current) fileInputRef.current.value = '' }
+  }
+
+  async function handleRemoveAvatar() {
+    try {
+      await fetch(`/api/upload/wg-avatar?wgId=${wg.id}`, { method: 'DELETE' })
+      setLocalAvatarUrl(null); onAvatarChanged(wg.id, null)
+    } catch { /* ignore */ }
+  }
+
   return (
     <Card className={cn('transition-shadow', isCurrentWg && 'ring-2 ring-indigo-200')}>
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-3">
+          {/* Avatar column */}
+          <div className="relative shrink-0">
+            {localAvatarUrl ? (
+              <Avatar className="h-14 w-14 ring-2 ring-indigo-100">
+                <AvatarImage src={localAvatarUrl} alt={wg.name} className="object-cover" />
+                <AvatarFallback className="text-base font-bold bg-indigo-100 text-indigo-700">{getInitials(wg.name)}</AvatarFallback>
+              </Avatar>
+            ) : (
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 ring-2 ring-indigo-100">
+                <span className="text-base font-extrabold text-indigo-400">{getInitials(wg.name)}</span>
+              </div>
+            )}
+            {uploadingAvatar && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40">
+                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={handleAvatarUpload}
+              disabled={uploadingAvatar}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAvatar}
+              title="Bild hochladen"
+              className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white shadow-sm hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            >
+              <Upload className="h-2.5 w-2.5" />
+            </button>
+          </div>
+
+          {/* Name + controls */}
           <div className="flex-1 min-w-0">
             {editing ? (
               <div className="flex items-center gap-2">
@@ -93,7 +160,7 @@ function WgCard({
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <CardTitle className="text-base truncate">{wg.name}</CardTitle>
                 {isCurrentWg && <Badge className="bg-indigo-100 text-indigo-700 text-xs shrink-0">Deine WG</Badge>}
                 <Button size="sm" variant="ghost" onClick={() => { setEditing(true); setNameInput(wg.name) }}
@@ -103,9 +170,17 @@ function WgCard({
               </div>
             )}
             {saveError && <p className="text-xs text-red-600 mt-1">{saveError}</p>}
-          </div>
-          <div className="flex items-center gap-1.5 text-sm text-gray-500 shrink-0">
-            <Users className="h-4 w-4" /><span className="font-medium">{wg._count.members}</span>
+            <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400">
+              <Users className="h-3.5 w-3.5" />
+              <span>{wg._count.members} Mitglieder</span>
+              {localAvatarUrl && (
+                <button type="button" onClick={handleRemoveAvatar}
+                  className="ml-1 text-red-400 hover:text-red-600 transition-colors">
+                  · Bild entfernen
+                </button>
+              )}
+            </div>
+            {uploadError && <p className="text-xs text-red-600 mt-1">{uploadError}</p>}
           </div>
         </div>
       </CardHeader>
@@ -404,6 +479,10 @@ export default function WgManagementPage() {
     setWgs((prev) => prev.map((w) => (w.id === id ? { ...w, name } : w)))
   }
 
+  function handleAvatarChanged(id: string, avatarUrl: string | null) {
+    setWgs((prev) => prev.map((w) => (w.id === id ? { ...w, avatarUrl } : w)))
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!newName.trim()) return
@@ -500,7 +579,7 @@ export default function WgManagementPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               {wgs.map((wg) => (
-                <WgCard key={wg.id} wg={wg} isCurrentWg={wg.id === currentWgId} onRenamed={handleRenamed} />
+                <WgCard key={wg.id} wg={wg} isCurrentWg={wg.id === currentWgId} onRenamed={handleRenamed} onAvatarChanged={handleAvatarChanged} />
               ))}
             </div>
           )}
