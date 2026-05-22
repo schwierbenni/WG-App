@@ -5,7 +5,7 @@ import { Smartphone } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 
-type PushState = 'loading' | 'unsupported' | 'denied' | 'enabled' | 'disabled'
+type PushState = 'loading' | 'unsupported' | 'ios-browser' | 'denied' | 'enabled' | 'disabled'
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -19,6 +19,7 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 const STATE_LABELS: Record<PushState, string> = {
   loading: 'Wird geladen…',
   unsupported: 'Nicht unterstützt',
+  'ios-browser': 'App installieren',
   denied: 'Blockiert im Browser',
   enabled: 'Aktiv',
   disabled: 'Inaktiv',
@@ -29,8 +30,16 @@ export function PushNotificationToggle() {
   const [toggling, setToggling] = React.useState(false)
 
   React.useEffect(() => {
-    if (typeof window === 'undefined' || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
       setState('unsupported')
+      return
+    }
+    if (!('PushManager' in window)) {
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true
+      setState(isIOS && !isStandalone ? 'ios-browser' : 'unsupported')
       return
     }
     if (Notification.permission === 'denied') {
@@ -108,6 +117,8 @@ export function PushNotificationToggle() {
               ? 'Im Browser blockiert – bitte in den Browser-Einstellungen erlauben'
               : state === 'unsupported'
               ? 'Dein Browser unterstützt Push-Benachrichtigungen nicht'
+              : state === 'ios-browser'
+              ? 'Tippe auf „Teilen" → „Zum Home-Bildschirm" und öffne die App von dort'
               : 'Benachrichtigungen für Dienste, Ankündigungen & Kalender'}
           </p>
         </div>
