@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   await prisma.pushSubscription.upsert({
     where: { endpoint },
-    update: { p256dh: keys.p256dh, auth: keys.auth },
+    update: { userId: session.user.id, p256dh: keys.p256dh, auth: keys.auth },
     create: {
       userId: session.user.id,
       endpoint,
