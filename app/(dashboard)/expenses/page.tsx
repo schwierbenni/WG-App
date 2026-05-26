@@ -37,7 +37,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { cn, formatDate, formatCurrency, getInitials } from '@/lib/utils'
 
-type ExpenseCategory = 'LEBENSMITTEL' | 'HAUSHALT' | 'MIETE_NEBENKOSTEN' | 'SONSTIGES'
+type ExpenseCategory = 'LEBENSMITTEL' | 'HAUSHALT' | 'MIETE_NEBENKOSTEN' | 'SONSTIGES' | 'SKAT' | 'DOPPELKOPF'
 type SplitMode = 'EQUAL' | 'INDIVIDUAL' | 'PERCENTAGE'
 
 interface SimpleUser {
@@ -86,6 +86,8 @@ const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
   HAUSHALT: 'Haushalt',
   MIETE_NEBENKOSTEN: 'Miete & NK',
   SONSTIGES: 'Sonstiges',
+  SKAT: 'Skat',
+  DOPPELKOPF: 'Doppelkopf',
 }
 
 const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
@@ -93,6 +95,8 @@ const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
   HAUSHALT: 'bg-blue-100 text-blue-700',
   MIETE_NEBENKOSTEN: 'bg-purple-100 text-purple-700',
   SONSTIGES: 'bg-gray-100 text-gray-600',
+  SKAT: 'bg-amber-100 text-amber-700',
+  DOPPELKOPF: 'bg-orange-100 text-orange-700',
 }
 
 const CATEGORIES: ExpenseCategory[] = ['LEBENSMITTEL', 'HAUSHALT', 'MIETE_NEBENKOSTEN', 'SONSTIGES']
