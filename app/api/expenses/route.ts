@@ -6,7 +6,7 @@ import { prisma } from '@/lib/db'
 const createExpenseSchema = z.object({
   amount: z.number().positive('Amount must be positive'),
   description: z.string().min(1, 'Description is required'),
-  category: z.enum(['LEBENSMITTEL', 'HAUSHALT', 'MIETE_NEBENKOSTEN', 'SONSTIGES']).optional(),
+  category: z.string().min(1).optional(),
   paidBy: z.string().optional(),
   splitWith: z.array(z.string()).min(1, 'splitWith must include at least one user'),
   splitMode: z.enum(['EQUAL', 'INDIVIDUAL', 'PERCENTAGE']).optional(),

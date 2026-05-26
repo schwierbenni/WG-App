@@ -21,6 +21,7 @@ model WGConfig {
   shoppingItems    ShoppingItem[]
   expenses         Expense[]
   settlements      Settlement[]
+  expenseCategories WGExpenseCategory[]
   notifications    Notification[]
   inviteTokens     InviteToken[]
   spotifyPlaylists SpotifyPlaylist[]
@@ -172,12 +173,28 @@ enum ShoppingCategory {
   SONSTIGES
 }
 
+model WGExpenseCategory {
+  id        String   @id @default(cuid())
+  wgId      String
+  name      String
+  slug      String
+  color     String   @default("#6b7280")
+  emoji     String?
+  isDefault Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  wg WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+
+  @@unique([wgId, slug])
+}
+
 model Expense {
-  id            String          @id @default(cuid())
+  id            String   @id @default(cuid())
   wgId          String
   amount        Float
   description   String
-  category      ExpenseCategory @default(SONSTIGES)
+  category      String   @default("SONSTIGES")
   paidBy        String
   splitWith     String[]
   splitMode     SplitMode       @default(EQUAL)
@@ -204,15 +221,6 @@ model Settlement {
   wg       WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
   fromUser User     @relation("SettlementFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
   toUser   User     @relation("SettlementTo", fields: [toUserId], references: [id], onDelete: Cascade)
-}
-
-enum ExpenseCategory {
-  LEBENSMITTEL
-  HAUSHALT
-  MIETE_NEBENKOSTEN
-  SONSTIGES
-  SKAT
-  DOPPELKOPF
 }
 
 enum SplitMode {
