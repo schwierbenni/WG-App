@@ -108,7 +108,7 @@ export async function POST(request: Request) {
             wgId,
             amount: debt.amountEuro,
             description: `${gameLabel} – ${debt.fromName} → ${debt.toName}`,
-            category: 'SONSTIGES',
+            category: gameType,
             paidBy: debt.toUserId,
             splitWith: [debt.toUserId, debt.fromUserId],
             splitMode: 'INDIVIDUAL',

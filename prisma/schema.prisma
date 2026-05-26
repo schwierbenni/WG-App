@@ -209,6 +209,8 @@ enum ExpenseCategory {
   HAUSHALT
   MIETE_NEBENKOSTEN
   SONSTIGES
+  SKAT
+  DOPPELKOPF
 }
 
 enum SplitMode {
