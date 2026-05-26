@@ -220,6 +220,7 @@ model Notification {
   userId    String
   type      NotificationType
   message   String
+  link      String?
   readAt    DateTime?
   createdAt DateTime         @default(now())
 

@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     const swapMessage = `${fromUser?.name ?? 'Jemand'} möchte den Dienst "${assignment.duty.name}" mit dir tauschen.`
 
     await prisma.notification.create({
-      data: { wgId, userId: toUserId, type: 'SWAP_REQUEST', message: swapMessage },
+      data: { wgId, userId: toUserId, type: 'SWAP_REQUEST', message: swapMessage, link: `/duties?swap=${swapRequest.id}` },
     })
 
     sendPushToUser(toUserId, { title: 'Tausch-Anfrage', body: swapMessage, url: `/duties?swap=${swapRequest.id}` }).catch(() => {})

@@ -108,8 +108,8 @@ export async function PATCH(
 
       await prisma.notification.createMany({
         data: [
-          { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: acceptMsg },
-          { wgId, userId: swapRequest.toUserId, type: 'ASSIGNMENT', message: assignMsg },
+          { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: acceptMsg, link: '/duties' },
+          { wgId, userId: swapRequest.toUserId, type: 'ASSIGNMENT', message: assignMsg, link: '/duties' },
         ],
       })
 
@@ -120,7 +120,7 @@ export async function PATCH(
       const rejectMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" abgelehnt${reasonSuffix}.`
 
       await prisma.notification.create({
-        data: { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: rejectMsg },
+        data: { wgId, userId: swapRequest.fromUserId, type: 'SWAP_REQUEST', message: rejectMsg, link: '/duties' },
       })
 
       sendPushToUser(swapRequest.fromUserId, { title: 'Tausch abgelehnt', body: rejectMsg, url: '/duties' }).catch(() => {})

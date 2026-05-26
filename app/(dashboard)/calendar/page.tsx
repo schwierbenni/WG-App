@@ -289,6 +289,14 @@ export default function CalendarPage() {
                       >
                         {format(day, 'd')}
                       </span>
+                      {day.getDate() === 1 && !today && (
+                        <span className={cn(
+                          'text-[9px] leading-none font-semibold uppercase tracking-wide -mt-0.5 mb-0.5',
+                          isCurrentMonth ? 'text-indigo-500' : 'text-gray-300',
+                        )}>
+                          {format(day, 'MMM', { locale: de })}
+                        </span>
+                      )}
 
                       {(dayAssignments.length > 0 || dayIcalEvents.length > 0) && (
                         <div className="flex flex-wrap gap-0.5 mt-0.5">
