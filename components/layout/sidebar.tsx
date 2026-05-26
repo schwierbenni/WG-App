@@ -218,8 +218,9 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
     { href: '/profile',    label: 'Profil',      icon: User },
     ...(isAdmin
       ? [
-          { href: '/admin/duties',  label: 'Verwaltung',  icon: Settings },
-          { href: '/admin/members', label: 'Mitglieder',  icon: Users },
+          { href: '/admin/duties',  label: 'Dienste',    icon: Settings },
+          { href: '/admin/members', label: 'Mitglieder', icon: Users },
+          { href: '/admin/wg',      label: 'WG-Einst.',  icon: Home },
         ]
       : []),
     ...(isSuperAdmin ? [{ href: '/super-admin', label: 'Super Admin', icon: Shield }] : []),

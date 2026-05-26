@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { Bell, Moon, Sun, LogOut, User } from 'lucide-react'
+import { Bell, Moon, Sun, LogOut, User, ArrowLeftRight, ClipboardList, Megaphone, Calendar } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,8 +17,17 @@ interface Notification {
   id: string
   type: string
   message: string
+  link: string | null
   readAt: string | null
   createdAt: string
+}
+
+const NOTIFICATION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  SWAP_REQUEST: ArrowLeftRight,
+  ASSIGNMENT: ClipboardList,
+  REMINDER: ClipboardList,
+  ANNOUNCEMENT: Megaphone,
+  ICAL_REMINDER: Calendar,
 }
 
 interface HeaderProps {
@@ -73,6 +82,7 @@ function ThemeToggle() {
 }
 
 function NotificationBell() {
+  const router = useRouter()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [open, setOpen] = useState(false)
 
@@ -99,6 +109,17 @@ function NotificationBell() {
       await fetch('/api/notifications/read-all', { method: 'POST' })
       setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })))
     } catch { /* ignore */ }
+  }
+
+  async function handleNotificationClick(n: Notification) {
+    setOpen(false)
+    if (!n.readAt) {
+      try {
+        await fetch(`/api/notifications/${n.id}/read`, { method: 'POST' })
+        setNotifications((prev) => prev.map((x) => x.id === n.id ? { ...x, readAt: new Date().toISOString() } : x))
+      } catch { /* ignore */ }
+    }
+    if (n.link) router.push(n.link)
   }
 
   return (
@@ -141,22 +162,31 @@ function NotificationBell() {
           </div>
         ) : (
           <div className="max-h-72 overflow-y-auto">
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                className={cn(
-                  'flex gap-3 px-3 py-2.5 text-sm border-b border-surface-border last:border-0',
-                  !n.readAt && 'bg-brand-muted'
-                )}
-              >
-                {!n.readAt && (
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-600" />
-                )}
-                <p className={cn('text-[var(--text-muted)]', !n.readAt && 'font-medium text-foreground')}>
-                  {n.message}
-                </p>
-              </div>
-            ))}
+            {notifications.map((n) => {
+              const Icon = NOTIFICATION_ICONS[n.type] ?? Bell
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => handleNotificationClick(n)}
+                  className={cn(
+                    'w-full flex gap-3 px-3 py-2.5 text-sm border-b border-surface-border last:border-0 text-left transition-colors',
+                    !n.readAt ? 'bg-brand-muted hover:bg-brand-muted/80' : 'hover:bg-surface-muted',
+                    n.link && 'cursor-pointer',
+                    !n.link && 'cursor-default',
+                  )}
+                >
+                  <span className={cn(
+                    'mt-0.5 shrink-0 flex h-6 w-6 items-center justify-center rounded-full',
+                    !n.readAt ? 'bg-brand-600 text-white' : 'bg-surface-muted text-[var(--text-muted)]',
+                  )}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <p className={cn('flex-1 text-[var(--text-muted)] leading-snug', !n.readAt && 'font-medium text-foreground')}>
+                    {n.message}
+                  </p>
+                </button>
+              )
+            })}
           </div>
         )}
       </DropdownMenuContent>
