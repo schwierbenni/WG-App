@@ -26,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-surface-muted">
+    <div className="fixed inset-0 flex overflow-hidden bg-surface-muted" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Desktop sidebar */}
       <Sidebar
         userRole={role}
