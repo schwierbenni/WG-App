@@ -3,8 +3,7 @@ import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { calculateDebts } from '@/lib/games'
 
-const createGameSchema = z.object({
-  gameType: z.enum(['SKAT', 'DOPPELKOPF']),
+const updateGameSchema = z.object({
   multiplier: z.number().positive('Multiplikator muss positiv sein'),
   players: z
     .array(
@@ -17,48 +16,32 @@ const createGameSchema = z.object({
     .max(4, 'Maximal 4 Spieler erlaubt'),
 })
 
-export async function GET() {
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   const auth = await requireWgSession()
   if (!auth.ok) return auth.response
   const { wgId } = auth
+  const { id } = await params
 
   try {
-    const sessions = await prisma.gameSession.findMany({
-      where: { wgId },
-      include: {
-        results: {
-          include: { user: { select: { id: true, name: true } } },
-        },
-      },
-      orderBy: { playedAt: 'desc' },
-      take: 20,
-    })
-    return Response.json({ sessions })
-  } catch (error) {
-    console.error('GET /api/games error:', error)
-    return Response.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
+    const existing = await prisma.gameSession.findFirst({ where: { id, wgId } })
+    if (!existing) {
+      return Response.json({ error: 'Spielrunde nicht gefunden' }, { status: 404 })
+    }
 
-export async function POST(request: Request) {
-  const auth = await requireWgSession()
-  if (!auth.ok) return auth.response
-  const { session, wgId } = auth
-
-  try {
     const body = await request.json()
-    const parsed = createGameSchema.safeParse(body)
-
+    const parsed = updateGameSchema.safeParse(body)
     if (!parsed.success) {
       return Response.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { gameType, multiplier, players } = parsed.data
-
-    const minPlayers = gameType === 'SKAT' ? 3 : 4
+    const { multiplier, players } = parsed.data
+    const minPlayers = existing.gameType === 'SKAT' ? 3 : 4
     if (players.length < minPlayers) {
       return Response.json(
-        { error: `${gameType === 'SKAT' ? 'Skat' : 'Doppelkopf'} erfordert mindestens ${minPlayers} Spieler` },
+        { error: `${existing.gameType === 'SKAT' ? 'Skat' : 'Doppelkopf'} erfordert mindestens ${minPlayers} Spieler` },
         { status: 400 }
       )
     }
@@ -68,28 +51,26 @@ export async function POST(request: Request) {
       where: { id: { in: userIds }, wgId },
       select: { id: true, name: true },
     })
-
     if (wgUsers.length !== userIds.length) {
       return Response.json({ error: 'Ein oder mehrere Spieler gehören nicht zu dieser WG' }, { status: 400 })
     }
 
     const userMap = new Map(wgUsers.map((u) => [u.id, u.name]))
-
     const playerResults = players.map((p) => ({
       userId: p.userId,
       name: userMap.get(p.userId) ?? p.userId,
       points: p.points,
     }))
-
     const debts = calculateDebts(playerResults, multiplier)
 
     const result = await prisma.$transaction(async (tx) => {
-      const gameSession = await tx.gameSession.create({
+      await tx.expense.deleteMany({ where: { gameSessionId: id } })
+      await tx.gameResult.deleteMany({ where: { gameSessionId: id } })
+
+      const updatedSession = await tx.gameSession.update({
+        where: { id },
         data: {
-          wgId,
-          gameType,
           multiplier,
-          createdBy: session.user.id,
           results: {
             create: players.map((p) => ({ userId: p.userId, points: p.points })),
           },
@@ -99,8 +80,8 @@ export async function POST(request: Request) {
         },
       })
 
-      const gameLabel = gameType === 'SKAT' ? 'Skat' : 'Doppelkopf'
-
+      const gameLabel = existing.gameType === 'SKAT' ? 'Skat' : 'Doppelkopf'
+      let expensesCreated = 0
       for (const debt of debts) {
         if (debt.amountEuro <= 0) continue
         await tx.expense.create({
@@ -108,26 +89,51 @@ export async function POST(request: Request) {
             wgId,
             amount: debt.amountEuro,
             description: `${gameLabel} – ${debt.fromName} → ${debt.toName}`,
-            category: gameType,
+            category: existing.gameType,
             paidBy: debt.toUserId,
             splitWith: [debt.toUserId, debt.fromUserId],
             splitMode: 'INDIVIDUAL',
-            splits: {
-              [debt.toUserId]: 0,
-              [debt.fromUserId]: debt.amountEuro,
-            },
+            splits: { [debt.toUserId]: 0, [debt.fromUserId]: debt.amountEuro },
             date: new Date(),
-            gameSessionId: gameSession.id,
+            gameSessionId: id,
           },
         })
+        expensesCreated++
       }
 
-      return { gameSession, expensesCreated: debts.filter((d) => d.amountEuro > 0).length }
+      return { session: updatedSession, expensesCreated }
     })
 
-    return Response.json({ ...result, debts }, { status: 201 })
+    return Response.json({ ...result, debts })
   } catch (error) {
-    console.error('POST /api/games error:', error)
+    console.error('PUT /api/games/[id] error:', error)
+    return Response.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = await requireWgSession()
+  if (!auth.ok) return auth.response
+  const { wgId } = auth
+  const { id } = await params
+
+  try {
+    const existing = await prisma.gameSession.findFirst({ where: { id, wgId } })
+    if (!existing) {
+      return Response.json({ error: 'Spielrunde nicht gefunden' }, { status: 404 })
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.deleteMany({ where: { gameSessionId: id } })
+      await tx.gameSession.delete({ where: { id } })
+    })
+
+    return Response.json({ success: true })
+  } catch (error) {
+    console.error('DELETE /api/games/[id] error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
