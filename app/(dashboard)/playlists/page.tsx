@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { useSession } from 'next-auth/react'
-import { ListMusic, Plus, ExternalLink, Trash2, Music2, X, Loader2 } from 'lucide-react'
+import { ListMusic, Plus, ExternalLink, Trash2, Music2, X, Loader2, Pencil, Check } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,13 +33,21 @@ function PlaylistCard({
   playlist,
   currentUserId,
   onDelete,
+  onUpdate,
 }: {
   playlist: Playlist
   currentUserId: string
   onDelete: (id: string) => void
+  onUpdate: (playlist: Playlist) => void
 }) {
   const isOwner = playlist.user.id === currentUserId
   const [deleting, setDeleting] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
+  const [editTitle, setEditTitle] = React.useState(playlist.title)
+  const [editDescription, setEditDescription] = React.useState(playlist.description ?? '')
+  const [editUrl, setEditUrl] = React.useState(playlist.spotifyUrl)
+  const [saving, setSaving] = React.useState(false)
+  const [editError, setEditError] = React.useState('')
 
   async function handleDelete() {
     setDeleting(true)
@@ -48,12 +56,118 @@ function PlaylistCard({
     setDeleting(false)
   }
 
+  function startEditing() {
+    setEditTitle(playlist.title)
+    setEditDescription(playlist.description ?? '')
+    setEditUrl(playlist.spotifyUrl)
+    setEditError('')
+    setEditing(true)
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setEditError('')
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/playlists/${playlist.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription || null,
+          spotifyUrl: editUrl,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        const firstError = Object.values(data.error ?? {})[0]
+        setEditError(Array.isArray(firstError) ? firstError[0] : (data.error ?? 'Fehler'))
+      } else {
+        onUpdate(data.playlist)
+        setEditing(false)
+      }
+    } catch {
+      setEditError('Netzwerkfehler')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   function handleOpen() {
     // Try Spotify app first, fall back to web
     const appUri = spotifyAppUrl(playlist.spotifyUrl)
     window.open(appUri, '_blank')
     // After short delay, if app didn't open, go to web URL
     setTimeout(() => window.open(playlist.spotifyUrl, '_blank'), 500)
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-surface rounded-2xl border border-[#1DB954]/40 p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-foreground flex items-center gap-2 text-sm">
+            <Pencil className="w-4 h-4 text-[#1DB954]" />
+            Playlist bearbeiten
+          </h3>
+          <button
+            onClick={() => setEditing(false)}
+            className="p-1 rounded-lg text-text-subtle hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSave} className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor={`edit-title-${playlist.id}`}>Titel</Label>
+            <Input
+              id={`edit-title-${playlist.id}`}
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              disabled={saving}
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor={`edit-desc-${playlist.id}`}>
+              Beschreibung <span className="text-text-subtle">(optional)</span>
+            </Label>
+            <Input
+              id={`edit-desc-${playlist.id}`}
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              disabled={saving}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor={`edit-url-${playlist.id}`}>Spotify-Link</Label>
+            <Input
+              id={`edit-url-${playlist.id}`}
+              value={editUrl}
+              onChange={(e) => setEditUrl(e.target.value)}
+              disabled={saving}
+              required
+              autoComplete="off"
+            />
+          </div>
+          {editError && (
+            <p className="text-sm text-danger bg-danger-bg rounded-lg px-3 py-2">{editError}</p>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="submit"
+              disabled={saving || !editTitle.trim() || !editUrl.trim()}
+              className="bg-[#1DB954] hover:bg-[#1aa34a] text-white flex-1"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              {saving ? 'Speichern…' : 'Speichern'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setEditing(false)} disabled={saving}>
+              Abbrechen
+            </Button>
+          </div>
+        </form>
+      </div>
+    )
   }
 
   return (
@@ -70,13 +184,27 @@ function PlaylistCard({
           )}
         </div>
         {isOwner && (
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="flex-shrink-0 p-1.5 rounded-lg text-text-subtle hover:text-danger hover:bg-danger-bg transition-colors opacity-0 group-hover:opacity-100"
-          >
-            {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-          </button>
+          <div className="flex-shrink-0 flex items-center gap-1">
+            <button
+              onClick={startEditing}
+              className={cn(
+                'p-1.5 rounded-lg text-text-subtle hover:text-[#1DB954] hover:bg-[#1DB954]/10 transition-colors',
+                'md:opacity-0 md:group-hover:opacity-100'
+              )}
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className={cn(
+                'p-1.5 rounded-lg text-text-subtle hover:text-danger hover:bg-danger-bg transition-colors',
+                'md:opacity-0 md:group-hover:opacity-100'
+              )}
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+            </button>
+          </div>
         )}
       </div>
 
@@ -190,6 +318,7 @@ function AddPlaylistForm({ onCreated }: { onCreated: (p: Playlist) => void }) {
             placeholder="https://open.spotify.com/playlist/..."
             disabled={saving}
             required
+            autoComplete="off"
           />
           <p className="text-[11px] text-text-subtle">
             In Spotify: Teilen → Link kopieren → hier einfügen
@@ -232,6 +361,10 @@ export default function PlaylistsPage() {
 
   function handleDeleted(id: string) {
     setPlaylists((prev) => prev.filter((p) => p.id !== id))
+  }
+
+  function handleUpdated(updated: Playlist) {
+    setPlaylists((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
   }
 
   return (
@@ -280,6 +413,7 @@ export default function PlaylistsPage() {
               playlist={playlist}
               currentUserId={session?.user?.id ?? ''}
               onDelete={handleDeleted}
+              onUpdate={handleUpdated}
             />
           ))}
         </div>
