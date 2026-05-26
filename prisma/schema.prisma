@@ -25,6 +25,7 @@ model WGConfig {
   inviteTokens     InviteToken[]
   spotifyPlaylists SpotifyPlaylist[]
   icalCalendars    ICalCalendar[]
+  gameSessions     GameSession[]
 }
 
 model User {
@@ -52,6 +53,8 @@ model User {
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
   spotifyPlaylists   SpotifyPlaylist[]
+  gameResults        GameResult[]
+  createdGames       GameSession[]          @relation("GameCreator")
 }
 
 enum Role {
@@ -307,4 +310,33 @@ model ICalEvent {
   calendar ICalCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
 
   @@unique([calendarId, uid])
+}
+
+model GameSession {
+  id         String   @id @default(cuid())
+  wgId       String
+  gameType   GameType
+  multiplier Float    @default(1)
+  playedAt   DateTime @default(now())
+  createdAt  DateTime @default(now())
+  createdBy  String
+
+  wg      WGConfig     @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  creator User         @relation("GameCreator", fields: [createdBy], references: [id])
+  results GameResult[]
+}
+
+model GameResult {
+  id            String @id @default(cuid())
+  gameSessionId String
+  userId        String
+  points        Int
+
+  session GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id])
+}
+
+enum GameType {
+  SKAT
+  DOPPELKOPF
 }
