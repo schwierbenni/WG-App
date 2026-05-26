@@ -269,8 +269,10 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
       <div
         className={cn(
           'fixed left-0 right-0 z-50 lg:hidden bg-surface rounded-t-3xl shadow-2xl border-t-2 border-surface-border',
-          'transition-transform duration-300 ease-out',
-          moreOpen ? 'translate-y-0' : 'translate-y-full'
+          'transition-[transform,opacity] duration-300 ease-out',
+          moreOpen
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
+            : 'translate-y-full opacity-0 pointer-events-none'
         )}
         style={{ bottom: `calc(64px + env(safe-area-inset-bottom, 0px))` }}
         aria-hidden={!moreOpen}
