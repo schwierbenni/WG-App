@@ -205,7 +205,7 @@ export function Header({ userName, userEmail, userAvatar, wgName, wgAvatarUrl }:
   const displayName = wgName ?? 'Meine WG'
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b-2 border-surface-border bg-surface px-4 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-12 lg:h-14 items-center justify-between gap-4 border-b-2 border-surface-border bg-surface px-4 shadow-sm">
       {/* WG identity – mobile only */}
       <Link
         href="/dashboard"
@@ -225,7 +225,7 @@ export function Header({ userName, userEmail, userAvatar, wgName, wgAvatarUrl }:
           </div>
         )}
         <span
-          className="text-lg font-extrabold text-brand-600"
+          className="text-base font-extrabold text-brand-600 truncate max-w-[140px]"
           style={{ fontFamily: 'var(--font-syne, system-ui)' }}
         >
           {displayName}

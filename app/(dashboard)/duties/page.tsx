@@ -259,22 +259,25 @@ export default function DutiesPage() {
         </Button>
       </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
-        <TabsList className="w-full sm:w-auto">
-          <TabsTrigger value="all">
-            Alle <span className="ml-1.5 text-xs font-semibold">{counts.all}</span>
-          </TabsTrigger>
-          <TabsTrigger value="offen">
-            Offen <span className="ml-1.5 text-xs font-semibold">{counts.offen}</span>
-          </TabsTrigger>
-          <TabsTrigger value="erledigt">
-            Erledigt <span className="ml-1.5 text-xs font-semibold">{counts.erledigt}</span>
-          </TabsTrigger>
-          <TabsTrigger value="überfällig">
-            Überfällig <span className="ml-1.5 text-xs font-semibold text-red-600">{counts.überfällig}</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+      {/* Horizontal-scrollable filter tabs on mobile */}
+      <div className="overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] -mx-4 px-4 sm:mx-0 sm:px-0">
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterTab)}>
+          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0">
+            <TabsTrigger value="all" className="min-h-[44px]">
+              Alle <span className="ml-1.5 text-xs font-semibold">{counts.all}</span>
+            </TabsTrigger>
+            <TabsTrigger value="offen" className="min-h-[44px]">
+              Offen <span className="ml-1.5 text-xs font-semibold">{counts.offen}</span>
+            </TabsTrigger>
+            <TabsTrigger value="erledigt" className="min-h-[44px]">
+              Erledigt <span className="ml-1.5 text-xs font-semibold">{counts.erledigt}</span>
+            </TabsTrigger>
+            <TabsTrigger value="überfällig" className="min-h-[44px]">
+              Überfällig <span className="ml-1.5 text-xs font-semibold text-red-600">{counts.überfällig}</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -283,7 +286,7 @@ export default function DutiesPage() {
       )}
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 [@media(min-width:520px)]:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}>
               <CardHeader className="pb-2">
@@ -307,7 +310,7 @@ export default function DutiesPage() {
           </p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 [@media(min-width:520px)]:grid-cols-2 lg:grid-cols-3">
           {filtered.map((duty) => {
             const assignment = duty.assignments[0]
             const status = getDutyStatus(assignment)
@@ -415,7 +418,7 @@ export default function DutiesPage() {
                           variant="outline"
                           onClick={() => handleComplete(assignment.id)}
                           disabled={completing === assignment.id}
-                          className="w-full gap-1.5 text-green-700 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          className="w-full gap-1.5 min-h-[44px] text-green-700 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 active:scale-95 transition-transform"
                         >
                           <CheckCircle2 className="h-4 w-4" />
                           {completing === assignment.id ? 'Markiere…' : 'Als erledigt markieren'}

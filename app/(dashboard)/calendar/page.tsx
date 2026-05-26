@@ -208,7 +208,7 @@ export default function CalendarPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 capitalize">
@@ -275,7 +275,7 @@ export default function CalendarPage() {
                       key={key}
                       onClick={() => setSelectedDay(isSameDay(day, selectedDay ?? new Date('invalid')) ? null : day)}
                       className={cn(
-                        'bg-white p-1.5 min-h-[60px] sm:min-h-[72px] flex flex-col items-start transition-colors hover:bg-indigo-50 text-left',
+                        'bg-white p-1 min-h-[44px] sm:min-h-[64px] flex flex-col items-start transition-colors hover:bg-indigo-50 active:bg-indigo-50 text-left',
                         !isCurrentMonth && 'bg-gray-50',
                         isSelected && 'bg-indigo-50 ring-2 ring-indigo-400 ring-inset z-10',
                       )}

@@ -172,7 +172,8 @@ export default function ShoppingPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAdd} className="space-y-3">
-            <div className="flex gap-2">
+            {/* Stacked on mobile, side-by-side on sm+ */}
+            <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1">
                 <Label htmlFor="item-name" className="sr-only">Artikelname</Label>
                 <Input
@@ -181,15 +182,16 @@ export default function ShoppingPage() {
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Artikelname..."
                   disabled={submitting}
+                  autoComplete="off"
                 />
               </div>
-              <div>
+              <div className="sm:w-40">
                 <Label htmlFor="item-category" className="sr-only">Kategorie</Label>
                 <select
                   id="item-category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value as ShoppingCategory)}
-                  className="h-9 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="h-11 w-full rounded-xl border-2 border-surface-border bg-white px-3 py-2 text-base focus:outline-none focus:border-brand-600"
                   disabled={submitting}
                 >
                   {CATEGORY_ORDER.map((cat) => (
@@ -208,12 +210,13 @@ export default function ShoppingPage() {
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Notiz (optional)..."
                 disabled={submitting}
+                autoComplete="off"
               />
             </div>
             {submitError && (
-              <p className="text-sm text-red-600 bg-red-50 rounded p-2">{submitError}</p>
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2">{submitError}</p>
             )}
-            <Button type="submit" disabled={submitting || !name.trim()} size="sm">
+            <Button type="submit" disabled={submitting || !name.trim()} className="w-full sm:w-auto min-h-[44px]">
               <Plus className="h-4 w-4" />
               {submitting ? 'Hinzufügen...' : 'Hinzufügen'}
             </Button>
@@ -251,8 +254,8 @@ export default function ShoppingPage() {
             <Card key={cat}>
               <CardHeader className="py-3 px-4">
                 <div className="flex items-center gap-2">
-                  <Badge className={CATEGORY_COLORS[cat]}>{CATEGORY_LABELS[cat]}</Badge>
-                  <span className="text-xs text-gray-400">{catItems.length}</span>
+                  <Badge className={`${CATEGORY_COLORS[cat]} text-sm px-3 py-0.5`}>{CATEGORY_LABELS[cat]}</Badge>
+                  <span className="text-sm text-gray-400">{catItems.length}</span>
                 </div>
               </CardHeader>
               <CardContent className="px-4 pb-3">
@@ -323,19 +326,19 @@ function ShoppingItemRow({
   const isOwner = item.user.id === currentUserId
 
   return (
-    <li className="flex items-center gap-2 py-1.5 group">
+    <li className="flex items-center gap-2 py-1.5">
       <button
         onClick={() => onToggleBought(item)}
         disabled={actionLoading === item.id + '-buy'}
         className={cn(
-          'shrink-0 h-5 w-5 rounded border-2 transition-colors flex items-center justify-center',
+          'shrink-0 h-8 w-8 rounded-lg border-2 transition-colors flex items-center justify-center active:scale-90',
           isBought
             ? 'border-green-500 bg-green-500 text-white'
             : 'border-gray-300 hover:border-indigo-500'
         )}
         title={isBought ? 'Als unverkauft markieren' : 'Als gekauft markieren'}
       >
-        {isBought && <CheckCircle2 className="h-3 w-3" />}
+        {isBought && <CheckCircle2 className="h-3.5 w-3.5" />}
       </button>
 
       <div className="flex-1 min-w-0">
@@ -377,10 +380,10 @@ function ShoppingItemRow({
         <button
           onClick={() => onDelete(item.id)}
           disabled={actionLoading === item.id + '-delete'}
-          className="shrink-0 h-7 w-7 rounded-md flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+          className="shrink-0 h-9 w-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 active:scale-90 transition-all"
           title="Löschen"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-4 w-4" />
         </button>
       )}
     </li>

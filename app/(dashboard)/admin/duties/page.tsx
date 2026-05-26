@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Plus, Pencil, Trash2, Pause, Play, RefreshCw, AlertCircle, UserPlus } from 'lucide-react'
+import { Plus, Pencil, Trash2, Pause, Play, RefreshCw, AlertCircle, UserPlus, MoreVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,12 @@ import {
 } from '@/components/ui/dialog'
 import { DutyForm } from '@/components/duties/duty-form'
 import { getIntervalLabel } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface Member {
   id: string
@@ -268,54 +274,51 @@ export default function AdminDutiesPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setAssignTarget(duty)
-                        setAssignUserId('')
-                        setAssignDueDate('')
-                      }}
-                      title="Manuell zuweisen"
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                    >
+                  {/* Desktop: inline buttons | Mobile: dropdown menu */}
+                  <div className="hidden sm:flex items-center gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" onClick={() => { setAssignTarget(duty); setAssignUserId(''); setAssignDueDate('') }} title="Manuell zuweisen" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                       <UserPlus className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleRotate(duty)}
-                      title="Rotation jetzt durchführen"
-                      className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => handleRotate(duty)} title="Rotation" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">
                       <RefreshCw className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleTogglePause(duty)}
-                      title={duty.isPaused ? 'Fortsetzen' : 'Pausieren'}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => handleTogglePause(duty)} title={duty.isPaused ? 'Fortsetzen' : 'Pausieren'}>
                       {duty.isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditDuty(duty)}
-                      title="Bearbeiten"
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => setEditDuty(duty)} title="Bearbeiten">
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setDeleteTarget(duty)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                      title="Löschen"
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(duty)} className="text-red-500 hover:text-red-700 hover:bg-red-50" title="Löschen">
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                  </div>
+
+                  <div className="sm:hidden shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button size="icon" variant="ghost" className="h-10 w-10">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => { setAssignTarget(duty); setAssignUserId(''); setAssignDueDate('') }}>
+                          <UserPlus className="h-4 w-4 mr-2" /> Zuweisen
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleRotate(duty)}>
+                          <RefreshCw className="h-4 w-4 mr-2" /> Rotation
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleTogglePause(duty)}>
+                          {duty.isPaused ? <Play className="h-4 w-4 mr-2" /> : <Pause className="h-4 w-4 mr-2" />}
+                          {duty.isPaused ? 'Fortsetzen' : 'Pausieren'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditDuty(duty)}>
+                          <Pencil className="h-4 w-4 mr-2" /> Bearbeiten
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDeleteTarget(duty)} className="text-red-600 focus:text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" /> Löschen
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardContent>

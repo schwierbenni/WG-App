@@ -255,34 +255,34 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Status chips */}
-        <div className="flex flex-wrap gap-2.5">
+        {/* Status chips – horizontal scroll on mobile, flex-wrap on desktop */}
+        <div className="flex gap-2.5 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap [scrollbar-width:none] [-webkit-overflow-scrolling:touch]">
           {overdue.length > 0 && (
-            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[var(--danger-bg)] px-4 py-2.5 text-center min-w-[72px] hover:shadow-md transition-shadow">
+            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--danger)_30%,transparent)] bg-[var(--danger-bg)] px-4 py-2.5 text-center min-w-[72px] shrink-0 hover:shadow-md transition-shadow active:scale-95">
               <p className="text-xl font-extrabold text-[var(--danger)] leading-none">{overdue.length}</p>
-              <p className="text-xs text-[var(--danger)] opacity-80 mt-0.5">Überfällig</p>
+              <p className="text-xs text-[var(--danger)] opacity-80 mt-0.5 whitespace-nowrap">Überfällig</p>
             </Link>
           )}
           {thisWeek.length > 0 && (
-            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[var(--warning-bg)] px-4 py-2.5 text-center min-w-[72px] hover:shadow-md transition-shadow">
+            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[var(--warning-bg)] px-4 py-2.5 text-center min-w-[72px] shrink-0 hover:shadow-md transition-shadow active:scale-95">
               <p className="text-xl font-extrabold text-[var(--warning)] leading-none">{thisWeek.length}</p>
-              <p className="text-xs text-[var(--warning)] opacity-80 mt-0.5">Diese Woche</p>
+              <p className="text-xs text-[var(--warning)] opacity-80 mt-0.5 whitespace-nowrap">Diese Woche</p>
             </Link>
           )}
           {swapRequests.length > 0 && (
-            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--brand-600)_30%,transparent)] bg-brand-muted px-4 py-2.5 text-center min-w-[72px] hover:shadow-md transition-shadow">
+            <Link href="/duties" className="rounded-2xl border-2 border-[color-mix(in_srgb,var(--brand-600)_30%,transparent)] bg-brand-muted px-4 py-2.5 text-center min-w-[72px] shrink-0 hover:shadow-md transition-shadow active:scale-95">
               <p className="text-xl font-extrabold text-brand-600 leading-none">{swapRequests.length}</p>
-              <p className="text-xs text-brand-600 opacity-80 mt-0.5">Tausch</p>
+              <p className="text-xs text-brand-600 opacity-80 mt-0.5 whitespace-nowrap">Tausch</p>
             </Link>
           )}
         </div>
       </div>
 
-      {/* ── WG Members ── */}
+      {/* ── WG Members – horizontally scrollable on mobile ── */}
       {members.length > 0 && (
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-webkit-overflow-scrolling:touch]">
           {members.map((m) => (
-            <div key={m.id} className="flex flex-col items-center gap-1.5">
+            <div key={m.id} className="flex shrink-0 flex-col items-center gap-1.5">
               <UserAvatar name={m.name} avatarUrl={m.avatarUrl} size="lg" />
               <span className="text-[11px] text-[var(--text-muted)] font-medium max-w-[56px] truncate text-center">
                 {m.id === userId ? 'Du' : m.name.split(' ')[0]}
@@ -406,7 +406,7 @@ export default async function DashboardPage() {
                       <AlertCircle className="h-3.5 w-3.5" />
                       Überfällig ({overdue.length})
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 [@media(min-width:480px)]:grid-cols-2">
                       {overdue.map((a) => (
                         <DutyCard
                           key={a.id}
@@ -423,7 +423,7 @@ export default async function DashboardPage() {
                     <p className="text-xs font-bold uppercase tracking-widest text-[var(--warning)] mb-2.5">
                       Diese Woche ({thisWeek.length})
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 [@media(min-width:480px)]:grid-cols-2">
                       {thisWeek.map((a) => (
                         <DutyCard
                           key={a.id}
@@ -440,7 +440,7 @@ export default async function DashboardPage() {
                     <p className="text-xs font-bold uppercase tracking-widest text-[var(--text-subtle)] mb-2.5">
                       Demnächst ({later.length})
                     </p>
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 [@media(min-width:480px)]:grid-cols-2">
                       {later.map((a) => (
                         <DutyCard
                           key={a.id}
@@ -574,8 +574,17 @@ export default async function DashboardPage() {
         <SectionHeader icon={ClipboardList} title="Alle Dienste – Übersicht" count={allAssignments.length} />
         <Suspense
           fallback={
-            <div className="rounded-2xl border-2 border-surface-border bg-surface p-8 text-center text-sm text-[var(--text-muted)]">
-              Lade Dienste…
+            <div className="rounded-2xl border-2 border-surface-border bg-surface overflow-hidden divide-y divide-surface-border">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+                  <div className="h-8 w-8 rounded-full bg-surface-muted animate-pulse shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 w-32 rounded bg-surface-muted animate-pulse" />
+                    <div className="h-2.5 w-20 rounded bg-surface-muted animate-pulse" />
+                  </div>
+                  <div className="h-5 w-16 rounded-full bg-surface-muted animate-pulse" />
+                </div>
+              ))}
             </div>
           }
         >
