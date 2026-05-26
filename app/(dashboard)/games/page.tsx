@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Dices, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Dices, ArrowLeft, CheckCircle2, AlertCircle, Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -63,6 +63,9 @@ export default function GamesPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [successCount, setSuccessCount] = useState(0)
+  const [editingSession, setEditingSession] = useState<GameSession | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -147,6 +150,38 @@ export default function GamesPage() {
     setStep('setup')
   }
 
+  const handleEdit = (sess: GameSession) => {
+    setEditingSession(sess)
+    setGameType(sess.gameType)
+    setMultiplier(String(sess.multiplier))
+    const ids = sess.results.map((r) => r.userId)
+    setSelectedPlayers(ids)
+    const pts: Record<string, string> = {}
+    for (const r of sess.results) pts[r.userId] = String(r.points)
+    setPlayerPoints(pts)
+    setError(null)
+    setStep('setup')
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeleting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/games/${id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string }
+        setError(data.error ?? 'Löschen fehlgeschlagen.')
+        return
+      }
+      setDeletingId(null)
+      await refreshHistory()
+    } catch {
+      setError('Netzwerkfehler beim Löschen.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const handleSubmit = async () => {
     setSubmitting(true)
     setError(null)
@@ -156,10 +191,17 @@ export default function GamesPage() {
         userId: uid,
         points: parseInt(playerPoints[uid] ?? '0', 10),
       }))
-      const res = await fetch('/api/games', {
-        method: 'POST',
+
+      const isEdit = editingSession !== null
+      const url = isEdit ? `/api/games/${editingSession.id}` : '/api/games'
+      const body = isEdit
+        ? { multiplier: mult, players }
+        : { gameType, multiplier: mult, players }
+
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameType, multiplier: mult, players }),
+        body: JSON.stringify(body),
       })
       const data = (await res.json()) as { expensesCreated?: number; error?: string }
       if (!res.ok) {
@@ -182,6 +224,7 @@ export default function GamesPage() {
     setPlayerPoints({})
     setMultiplier('1')
     setError(null)
+    setEditingSession(null)
   }
 
   return (
@@ -235,19 +278,22 @@ export default function GamesPage() {
       {step === 'setup' && (
         <div className="space-y-5">
           <button
-            onClick={() => setStep('select-game')}
+            onClick={handleReset}
             className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
-            Zurück zur Spielauswahl
+            {editingSession ? 'Abbrechen' : 'Zurück zur Spielauswahl'}
           </button>
 
           <div className="flex items-center gap-2">
             <span className="text-2xl">{gameType === 'SKAT' ? '🃏' : '🂡'}</span>
             <h2 className="text-xl font-bold">{gameType === 'SKAT' ? 'Skat' : 'Doppelkopf'}</h2>
-            <Badge variant="secondary">
-              {minPlayers === maxPlayers ? `${minPlayers} Spieler` : `${minPlayers}–${maxPlayers} Spieler`}
-            </Badge>
+            {editingSession && <Badge variant="secondary">Bearbeiten</Badge>}
+            {!editingSession && (
+              <Badge variant="secondary">
+                {minPlayers === maxPlayers ? `${minPlayers} Spieler` : `${minPlayers}–${maxPlayers} Spieler`}
+              </Badge>
+            )}
           </div>
 
           {/* Multiplier */}
@@ -405,7 +451,11 @@ export default function GamesPage() {
               Zurück
             </Button>
             <Button onClick={handleSubmit} disabled={submitting} className="flex-1 min-h-[48px]">
-              {submitting ? 'Wird gespeichert…' : 'Ausgaben erstellen'}
+              {submitting
+                ? 'Wird gespeichert…'
+                : editingSession
+                ? 'Ausgaben aktualisieren'
+                : 'Ausgaben erstellen'}
             </Button>
           </div>
         </div>
@@ -417,9 +467,12 @@ export default function GamesPage() {
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950/30">
             <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
             <div>
-              <p className="font-bold text-green-800 dark:text-green-300">Abrechnung gespeichert!</p>
+              <p className="font-bold text-green-800 dark:text-green-300">
+                {editingSession ? 'Abrechnung aktualisiert!' : 'Abrechnung gespeichert!'}
+              </p>
               <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                {successCount} {successCount === 1 ? 'Ausgabe wurde' : 'Ausgaben wurden'} erstellt.
+                {successCount} {successCount === 1 ? 'Ausgabe wurde' : 'Ausgaben wurden'}{' '}
+                {editingSession ? 'aktualisiert' : 'erstellt'}.
               </p>
             </div>
             <div className="flex gap-3 mt-2">
@@ -442,13 +495,16 @@ export default function GamesPage() {
         ) : history.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">Noch keine Spielrunden aufgezeichnet.</p>
         ) : (
-          history.slice(0, 5).map((sess) => {
+          history.slice(0, 20).map((sess) => {
             const label = sess.gameType === 'SKAT' ? 'Skat' : 'Doppelkopf'
             const icon = sess.gameType === 'SKAT' ? '🃏' : '🂡'
             const sorted = [...sess.results].sort((a, b) => b.points - a.points)
+            const isConfirmingDelete = deletingId === sess.id
+
             return (
               <Card key={sess.id} className="card-hover">
                 <CardContent className="pt-3 pb-3 px-4">
+                  {/* Header row */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span>{icon}</span>
@@ -456,10 +512,28 @@ export default function GamesPage() {
                       <span className="text-xs text-[var(--text-muted)]">·</span>
                       <span className="text-xs text-[var(--text-muted)]">{formatDate(sess.playedAt)}</span>
                     </div>
-                    <Badge variant="secondary" className="text-xs">
-                      {sess.multiplier} Ct/Pkt
-                    </Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="secondary" className="text-xs">
+                        {sess.multiplier} Ct/Pkt
+                      </Badge>
+                      <button
+                        onClick={() => handleEdit(sess)}
+                        className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-foreground hover:bg-surface-muted transition-all min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        aria-label="Bearbeiten"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setDeletingId(isConfirmingDelete ? null : sess.id)}
+                        className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-all min-h-[36px] min-w-[36px] flex items-center justify-center"
+                        aria-label="Löschen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Player results */}
                   <div className="flex flex-wrap gap-2">
                     {sorted.map((r) => (
                       <span
@@ -471,6 +545,33 @@ export default function GamesPage() {
                       </span>
                     ))}
                   </div>
+
+                  {/* Inline delete confirmation */}
+                  {isConfirmingDelete && (
+                    <div className="mt-3 pt-3 border-t border-surface-border flex items-center justify-between gap-3">
+                      <p className="text-xs text-red-600 dark:text-red-400 flex-1">
+                        Spielrunde und alle zugehörigen Ausgaben löschen?
+                      </p>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeletingId(null)}
+                          className="h-8 text-xs"
+                        >
+                          Abbrechen
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleDelete(sess.id)}
+                          disabled={deleting}
+                          className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white border-0"
+                        >
+                          {deleting ? 'Löschen…' : 'Ja, löschen'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )

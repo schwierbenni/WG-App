@@ -173,21 +173,23 @@ enum ShoppingCategory {
 }
 
 model Expense {
-  id          String          @id @default(cuid())
-  wgId        String
-  amount      Float
-  description String
-  category    ExpenseCategory @default(SONSTIGES)
-  paidBy      String
-  splitWith   String[]
-  splitMode   SplitMode       @default(EQUAL)
-  splits      Json?
-  date        DateTime        @default(now())
-  settledAt   DateTime?
-  createdAt   DateTime        @default(now())
+  id            String          @id @default(cuid())
+  wgId          String
+  amount        Float
+  description   String
+  category      ExpenseCategory @default(SONSTIGES)
+  paidBy        String
+  splitWith     String[]
+  splitMode     SplitMode       @default(EQUAL)
+  splits        Json?
+  date          DateTime        @default(now())
+  settledAt     DateTime?
+  createdAt     DateTime        @default(now())
+  gameSessionId String?
 
-  wg         WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
-  paidByUser User     @relation(fields: [paidBy], references: [id])
+  wg          WGConfig     @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  paidByUser  User         @relation(fields: [paidBy], references: [id])
+  gameSession GameSession? @relation("GameExpenses", fields: [gameSessionId], references: [id], onDelete: SetNull)
 }
 
 model Settlement {
@@ -326,6 +328,7 @@ model GameSession {
   wg      WGConfig     @relation(fields: [wgId], references: [id], onDelete: Cascade)
   creator User         @relation("GameCreator", fields: [createdBy], references: [id])
   results GameResult[]
+  gameExpenses Expense[] @relation("GameExpenses")
 }
 
 model GameResult {

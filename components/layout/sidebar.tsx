@@ -170,10 +170,10 @@ export function Sidebar({ userRole, userEmail, wgName, wgAvatarUrl }: SidebarPro
 
 /* ─── Mobile bottom navigation ──────────────────────────────────────────── */
 const bottomPrimary: NavItem[] = [
-  { href: '/dashboard',     label: 'Home',    icon: Home },
-  { href: '/duties',        label: 'Dienste', icon: ClipboardList },
-  { href: '/announcements', label: 'Brett',   icon: Megaphone },
-  { href: '/shopping',      label: 'Einkauf', icon: ShoppingCart },
+  { href: '/dashboard', label: 'Home',     icon: Home },
+  { href: '/duties',    label: 'Dienste',  icon: ClipboardList },
+  { href: '/calendar',  label: 'Kalender', icon: Calendar },
+  { href: '/expenses',  label: 'Ausgaben', icon: CreditCard },
 ]
 
 function BottomNavLink({
@@ -236,12 +236,12 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
   }, [moreOpen])
 
   const moreItems: NavItem[] = [
-    { href: '/calendar',   label: 'Kalender',    icon: Calendar },
-    { href: '/statistics', label: 'Statistiken', icon: BarChart2 },
-    { href: '/expenses',   label: 'Ausgaben',    icon: CreditCard },
-    { href: '/games',      label: 'Spiele',      icon: Dices },
-    { href: '/playlists',  label: 'Playlists',   icon: ListMusic },
-    { href: '/profile',    label: 'Profil',      icon: User },
+    { href: '/announcements', label: 'Brett',       icon: Megaphone },
+    { href: '/shopping',      label: 'Einkauf',     icon: ShoppingCart },
+    { href: '/statistics',    label: 'Statistiken', icon: BarChart2 },
+    { href: '/games',         label: 'Spiele',      icon: Dices },
+    { href: '/playlists',     label: 'Playlists',   icon: ListMusic },
+    { href: '/profile',       label: 'Profil',      icon: User },
     ...(isAdmin
       ? [
           { href: '/admin/duties',  label: 'Dienste',    icon: Settings },
