@@ -26,7 +26,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-surface-muted">
+    <div className="fixed inset-0 flex overflow-hidden bg-surface-muted">
       {/* Desktop sidebar */}
       <Sidebar
         userRole={role}
@@ -47,7 +47,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
 
         {/* Main content — extra bottom padding on mobile for the bottom nav */}
-        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-24 lg:pb-6 [-webkit-overflow-scrolling:touch]">
+        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-24 lg:pb-6">
           {children}
         </main>
       </div>

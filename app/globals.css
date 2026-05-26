@@ -120,8 +120,6 @@ h1, h2, h3, h4, h5, h6 {
 html {
   scroll-behavior: smooth;
   height: 100%;
-  /* Prevent content from going under notches/home indicator */
-  padding-top: env(safe-area-inset-top);
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */
