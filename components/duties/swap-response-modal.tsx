@@ -3,12 +3,12 @@
 import * as React from 'react'
 import { ArrowLeftRight, Check, X, Clock } from 'lucide-react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+  ResponsiveModalRoot,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+  ResponsiveModalFooter,
+} from '@/components/ui/responsive-modal'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -87,28 +87,28 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
   }
 
   return (
-    <Dialog open onOpenChange={(isOpen: boolean) => { if (!isOpen) onClose() }}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <ResponsiveModalRoot open onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
+      <ResponsiveModalContent className="sm:max-w-sm">
+        <ResponsiveModalHeader>
+          <ResponsiveModalTitle className="flex items-center gap-2">
             <ArrowLeftRight className="h-5 w-5 text-indigo-600" />
             Tauschangfrage
-          </DialogTitle>
-        </DialogHeader>
+          </ResponsiveModalTitle>
+        </ResponsiveModalHeader>
 
         {loading ? (
           <div className="space-y-3 py-2">
-            <Skeleton className="h-16 w-full rounded-lg" />
-            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full rounded-xl" />
           </div>
         ) : loadError ? (
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+          <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
             {loadError}
           </div>
         ) : swap ? (
           <div className="space-y-4">
             {/* Requester info */}
-            <div className="flex items-center gap-3 rounded-lg bg-indigo-50 border border-indigo-100 p-3">
+            <div className="flex items-center gap-3 rounded-xl bg-indigo-50 border border-indigo-100 p-3">
               <Avatar className="h-10 w-10 shrink-0">
                 {swap.fromUser.avatarUrl && (
                   <AvatarImage src={swap.fromUser.avatarUrl} alt={swap.fromUser.name} />
@@ -124,7 +124,7 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
             </div>
 
             {/* Duty details */}
-            <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 space-y-1">
+            <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 space-y-1">
               <p className="text-xs font-medium text-gray-500 flex items-center gap-1">
                 <Clock className="h-3 w-3" /> Dienst
               </p>
@@ -139,7 +139,7 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
               </p>
             </div>
 
-            {/* Optional message/reason */}
+            {/* Optional message */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Begründung <span className="text-gray-400">(optional)</span>
@@ -151,22 +151,22 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
                 maxLength={500}
                 rows={2}
                 disabled={submitting}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                className="w-full rounded-xl border-2 border-surface-border bg-white px-3 py-2 text-base sm:text-sm resize-none focus:outline-none focus:border-brand-600 disabled:opacity-50"
               />
             </div>
 
             {actionError && (
-              <p className="text-sm text-red-600 bg-red-50 rounded p-2">{actionError}</p>
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2">{actionError}</p>
             )}
           </div>
         ) : null}
 
-        <DialogFooter className="gap-2 sm:gap-2">
+        <ResponsiveModalFooter>
           <Button
             variant="outline"
             onClick={onClose}
             disabled={submitting}
-            className="flex-1"
+            className="flex-1 min-h-[44px]"
           >
             Schließen
           </Button>
@@ -176,7 +176,7 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
                 variant="outline"
                 onClick={() => handleAction('reject')}
                 disabled={submitting}
-                className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                className="flex-1 min-h-[44px] text-red-600 border-red-200 hover:bg-red-50"
               >
                 <X className="h-4 w-4 mr-1" />
                 {submitting ? '…' : 'Ablehnen'}
@@ -184,15 +184,15 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
               <Button
                 onClick={() => handleAction('accept')}
                 disabled={submitting}
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
               >
                 <Check className="h-4 w-4 mr-1" />
                 {submitting ? '…' : 'Annehmen'}
               </Button>
             </>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </ResponsiveModalFooter>
+      </ResponsiveModalContent>
+    </ResponsiveModalRoot>
   )
 }

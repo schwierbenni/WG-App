@@ -36,6 +36,15 @@ interface Announcement {
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉']
 const MAX_LENGTH = 500
 
+function RelativeTime({ date }: { date: string }) {
+  const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+  if (diff < 60) return <>gerade eben</>
+  if (diff < 3600) return <>vor {Math.floor(diff / 60)} Min.</>
+  if (diff < 86400) return <>vor {Math.floor(diff / 3600)} Std.</>
+  if (diff < 604800) return <>vor {Math.floor(diff / 86400)} Tagen</>
+  return <>{new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</>
+}
+
 export default function AnnouncementsPage() {
   const { data: session } = useSession()
   const [announcements, setAnnouncements] = React.useState<Announcement[]>([])
@@ -171,34 +180,30 @@ export default function AnnouncementsPage() {
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Was möchtest du mitteilen?"
-                rows={3}
+                rows={4}
                 maxLength={MAX_LENGTH}
-                className="resize-none pr-16"
+                className="resize-none pr-16 text-base sm:text-sm min-h-[100px]"
               />
               <span
                 className={cn(
                   'absolute bottom-2 right-2 text-xs',
-                  content.length > MAX_LENGTH * 0.9
-                    ? 'text-red-500'
-                    : 'text-gray-400'
+                  content.length > MAX_LENGTH * 0.9 ? 'text-red-500' : 'text-gray-400'
                 )}
               >
                 {content.length}/{MAX_LENGTH}
               </span>
             </div>
             {submitError && (
-              <p className="text-sm text-red-600 bg-red-50 rounded p-2">{submitError}</p>
+              <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2">{submitError}</p>
             )}
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                disabled={submitting || !content.trim() || content.length > MAX_LENGTH}
-                size="sm"
-              >
-                <Send className="h-4 w-4" />
-                {submitting ? 'Sende...' : 'Veröffentlichen'}
-              </Button>
-            </div>
+            <Button
+              type="submit"
+              disabled={submitting || !content.trim() || content.length > MAX_LENGTH}
+              className="w-full sm:w-auto sm:ml-auto sm:flex min-h-[44px]"
+            >
+              <Send className="h-4 w-4" />
+              {submitting ? 'Sende...' : 'Veröffentlichen'}
+            </Button>
           </form>
         </CardContent>
       </Card>
@@ -256,7 +261,7 @@ export default function AnnouncementsPage() {
                         )}
                       </span>
                       <span className="text-xs text-gray-400">
-                        {formatDate(announcement.createdAt, 'dd.MM.yyyy HH:mm')}
+                        <RelativeTime date={announcement.createdAt} />
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">
@@ -278,16 +283,16 @@ export default function AnnouncementsPage() {
                         onClick={() => handleReaction(announcement.id, emoji)}
                         disabled={reactionLoading === loadingKey}
                         className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors',
+                          'inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm transition-all min-h-[44px] min-w-[44px] active:scale-90',
                           mine
                             ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                             : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
                           reactionLoading === loadingKey && 'opacity-50 cursor-wait'
                         )}
                       >
-                        <span>{emoji}</span>
+                        <span className="text-base">{emoji}</span>
                         {count > 0 && (
-                          <span className="text-xs font-medium">{count}</span>
+                          <span className="text-sm font-medium">{count}</span>
                         )}
                       </button>
                     )

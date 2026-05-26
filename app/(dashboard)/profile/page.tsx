@@ -255,19 +255,19 @@ export default function ProfilePage() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+            <Avatar className="h-20 w-20 shrink-0">
               {profile.avatarUrl && (
                 <AvatarImage src={profile.avatarUrl} alt={profile.name} />
               )}
-              <AvatarFallback className="text-xl bg-indigo-100 text-indigo-700">
+              <AvatarFallback className="text-2xl bg-indigo-100 text-indigo-700">
                 {getInitials(profile.name)}
               </AvatarFallback>
             </Avatar>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{profile.name}</h2>
-              <p className="text-sm text-gray-500">{profile.email}</p>
-              <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-gray-500 break-all">{profile.email}</p>
+              <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
                 <Badge
                   className={
                     profile.role === 'ADMIN'
@@ -307,8 +307,8 @@ export default function ProfilePage() {
             </div>
             <div className="space-y-2">
               <Label>Profilbild</Label>
-              <div className="flex items-center gap-4">
-                <div className="relative">
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <div className="relative shrink-0">
                   <Avatar className="h-16 w-16">
                     {avatarUrl && <AvatarImage src={avatarUrl} alt="Vorschau" />}
                     <AvatarFallback className="text-lg bg-indigo-100 text-indigo-700">
@@ -493,7 +493,7 @@ export default function ProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 rounded-lg border border-red-200 bg-red-50">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl border border-red-200 bg-red-50">
             <div>
               <p className="text-sm font-medium text-red-800">Konto löschen</p>
               <p className="text-xs text-red-600 mt-0.5">
@@ -502,11 +502,11 @@ export default function ProfilePage() {
             </div>
             <Button
               variant="destructive"
-              size="sm"
               onClick={() => setShowDeleteDialog(true)}
+              className="w-full sm:w-auto min-h-[44px]"
             >
               <Trash2 className="h-4 w-4" />
-              Löschen
+              Konto löschen
             </Button>
           </div>
         </CardContent>

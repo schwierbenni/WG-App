@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   Users, Link as LinkIcon, Copy, Check, Trash2,
-  Shield, ShieldOff, RefreshCw, ArrowRightLeft,
+  Shield, ShieldOff, RefreshCw, ArrowRightLeft, MoreVertical,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,12 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { cn, getInitials, formatDate } from '@/lib/utils'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 const SUPER_ADMIN_EMAIL = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL ?? 'schwier.b@gmail.com'
 
@@ -313,54 +319,67 @@ export default function AdminMembersPage() {
                       <p className="text-xs text-gray-300">Seit {formatDate(member.createdAt)}</p>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      {/* WG move dropdown – Super Admin only */}
-                      {superAdmin && allWgs.length > 1 && !isSelf && (
-                        <div className="relative">
-                          <Select
-                            value={member.wgId}
-                            onChange={(e) => handleWgChange(member, e.target.value)}
-                            disabled={wgLoading === member.id}
-                            className="text-xs h-8 py-0 pr-7 min-w-[120px] max-w-[160px]"
-                          >
-                            {allWgs.map((wg) => (
-                              <option key={wg.id} value={wg.id}>{wg.name}</option>
-                            ))}
-                          </Select>
-                          {wgLoading === member.id && (
-                            <RefreshCw className="absolute right-7 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin text-gray-400 pointer-events-none" />
+                    {!isSelf && (
+                      <>
+                        {/* Desktop: inline buttons */}
+                        <div className="hidden sm:flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                          {superAdmin && allWgs.length > 1 && (
+                            <div className="relative">
+                              <Select
+                                value={member.wgId}
+                                onChange={(e) => handleWgChange(member, e.target.value)}
+                                disabled={wgLoading === member.id}
+                                className="text-xs h-8 py-0 pr-7 min-w-[120px] max-w-[160px]"
+                              >
+                                {allWgs.map((wg) => (
+                                  <option key={wg.id} value={wg.id}>{wg.name}</option>
+                                ))}
+                              </Select>
+                              {wgLoading === member.id && (
+                                <RefreshCw className="absolute right-7 top-1/2 -translate-y-1/2 h-3 w-3 animate-spin text-gray-400 pointer-events-none" />
+                              )}
+                            </div>
                           )}
-                        </div>
-                      )}
-
-                      {!isSelf && (
-                        <>
                           <Button
                             variant="ghost" size="sm"
-                            className={cn('h-8 text-xs', member.role === 'ADMIN'
-                              ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50'
-                              : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50')}
+                            className={cn('h-8 text-xs', member.role === 'ADMIN' ? 'text-amber-600 hover:bg-amber-50' : 'text-indigo-600 hover:bg-indigo-50')}
                             disabled={roleLoading === member.id}
                             onClick={() => handleRoleChange(member)}
                           >
-                            {roleLoading === member.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                              : member.role === 'ADMIN' ? <ShieldOff className="h-3.5 w-3.5" />
-                              : <Shield className="h-3.5 w-3.5" />}
-                            <span className="hidden sm:inline">
-                              {member.role === 'ADMIN' ? 'Degradieren' : 'Admin'}
-                            </span>
+                            {roleLoading === member.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : member.role === 'ADMIN' ? <ShieldOff className="h-3.5 w-3.5" /> : <Shield className="h-3.5 w-3.5" />}
+                            {member.role === 'ADMIN' ? 'Degradieren' : 'Admin'}
                           </Button>
-                          <Button
-                            variant="ghost" size="sm"
-                            className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50"
-                            onClick={() => { setRemoveTarget(member); setRemoveConfirm(''); setRemoveError('') }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span className="hidden sm:inline">Entfernen</span>
+                          <Button variant="ghost" size="sm" className="h-8 text-red-500 hover:bg-red-50" onClick={() => { setRemoveTarget(member); setRemoveConfirm(''); setRemoveError('') }}>
+                            <Trash2 className="h-3.5 w-3.5" /> Entfernen
                           </Button>
-                        </>
-                      )}
-                    </div>
+                        </div>
+
+                        {/* Mobile: dropdown */}
+                        <div className="sm:hidden shrink-0">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-10 w-10">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleRoleChange(member)} disabled={roleLoading === member.id}>
+                                {member.role === 'ADMIN' ? <ShieldOff className="h-4 w-4 mr-2" /> : <Shield className="h-4 w-4 mr-2" />}
+                                {member.role === 'ADMIN' ? 'Degradieren' : 'Zum Admin'}
+                              </DropdownMenuItem>
+                              {superAdmin && allWgs.length > 1 && allWgs.filter(wg => wg.id !== member.wgId).map(wg => (
+                                <DropdownMenuItem key={wg.id} onClick={() => handleWgChange(member, wg.id)} disabled={wgLoading === member.id}>
+                                  <ArrowRightLeft className="h-4 w-4 mr-2" /> → {wg.name}
+                                </DropdownMenuItem>
+                              ))}
+                              <DropdownMenuItem onClick={() => { setRemoveTarget(member); setRemoveConfirm(''); setRemoveError('') }} className="text-red-600 focus:text-red-600">
+                                <Trash2 className="h-4 w-4 mr-2" /> Entfernen
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </>
+                    )}
                   </li>
                 )
               })}

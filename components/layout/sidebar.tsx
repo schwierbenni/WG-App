@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Home, ClipboardList, Calendar, BarChart2, Megaphone,
   ShoppingCart, CreditCard, User, Settings, Users,
-  ChevronRight, Grid3X3, X, ListMusic, Shield,
+  Grid3X3, X, ListMusic, Shield, ChevronRight,
 } from 'lucide-react'
 import { cn, getInitials } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -73,7 +73,13 @@ function SidebarNavLink({ item, onClick }: { item: NavItem; onClick?: () => void
 }
 
 /* ─── Desktop sidebar content ───────────────────────────────────────────── */
-function SidebarContent({ userRole, userEmail, wgName, wgAvatarUrl, onLinkClick }: { userRole?: string; userEmail?: string; wgName?: string; wgAvatarUrl?: string | null; onLinkClick?: () => void }) {
+function SidebarContent({ userRole, userEmail, wgName, wgAvatarUrl, onLinkClick }: {
+  userRole?: string
+  userEmail?: string
+  wgName?: string
+  wgAvatarUrl?: string | null
+  onLinkClick?: () => void
+}) {
   const isAdmin = userRole === 'ADMIN'
   const isSuperAdmin = !!userEmail && userEmail === SUPER_ADMIN_EMAIL
   const displayName = wgName ?? 'Meine WG'
@@ -92,17 +98,12 @@ function SidebarContent({ userRole, userEmail, wgName, wgAvatarUrl, onLinkClick 
             </Avatar>
           ) : (
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand-600)] shadow-md ring-2 ring-white/20">
-              <span className="text-sm font-extrabold text-white">
-                {getInitials(displayName)}
-              </span>
+              <span className="text-sm font-extrabold text-white">{getInitials(displayName)}</span>
             </div>
           )}
         </div>
         <div className="min-w-0">
-          <span
-            className="block text-base font-extrabold text-white leading-none truncate"
-            style={{ fontFamily: 'var(--font-syne, system-ui)' }}
-          >
+          <span className="block text-base font-extrabold text-white leading-none truncate" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
             {displayName}
           </span>
           <p className="text-[10px] text-[var(--sidebar-text)] leading-tight mt-0.5 tracking-widest uppercase">
@@ -188,15 +189,25 @@ function BottomNavLink({
       href={item.href}
       onClick={onClick}
       className={cn(
-        'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-colors relative',
+        'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-all duration-150 relative',
+        'active:scale-90',
         active ? 'text-brand-600' : 'text-[var(--text-muted)]'
       )}
     >
       {active && (
-        <span className="absolute top-1 w-1 h-1 rounded-full bg-brand-600 nav-active-dot" />
+        <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-brand-600" />
       )}
-      <item.icon className={cn('h-5 w-5 transition-transform', active && 'scale-110')} />
-      <span className={cn('text-[10px]', active ? 'font-bold' : 'font-medium')}>
+      <span className={cn(
+        'flex items-center justify-center rounded-xl transition-all duration-150',
+        active ? 'scale-110' : 'scale-100'
+      )}>
+        <item.icon className="h-5 w-5" />
+      </span>
+      {/* Hide labels at very small screens (< 360px) */}
+      <span className={cn(
+        'text-[10px] leading-none hidden [@media(min-width:320px)]:block',
+        active ? 'font-bold' : 'font-medium'
+      )}>
         {item.label}
       </span>
     </Link>
@@ -210,7 +221,20 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
   const isAdmin = userRole === 'ADMIN'
   const isSuperAdmin = !!userEmail && userEmail === SUPER_ADMIN_EMAIL
 
-  const moreItems = [
+  // Close drawer on route change
+  useEffect(() => { setMoreOpen(false) }, [pathname])
+
+  // Lock body scroll when drawer open
+  useEffect(() => {
+    if (moreOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [moreOpen])
+
+  const moreItems: NavItem[] = [
     { href: '/calendar',   label: 'Kalender',    icon: Calendar },
     { href: '/statistics', label: 'Statistiken', icon: BarChart2 },
     { href: '/expenses',   label: 'Ausgaben',    icon: CreditCard },
@@ -232,65 +256,69 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
 
   return (
     <>
-      {/* More sheet backdrop */}
+      {/* Fullscreen overlay backdrop */}
       {moreOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={() => setMoreOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* More bottom sheet */}
-      {moreOpen && (
-        <div
-          className="fixed left-0 right-0 z-50 lg:hidden bg-surface rounded-t-3xl shadow-2xl border-t border-surface-border"
-          style={{ bottom: `calc(64px + env(safe-area-inset-bottom, 0px))` }}
-        >
-          <div className="px-4 pt-3 pb-4">
-            <div className="flex items-center justify-between mb-4">
-              <p
-                className="text-sm font-bold text-foreground"
-                style={{ fontFamily: 'var(--font-syne, system-ui)' }}
-              >
-                Mehr
-              </p>
-              <button
-                onClick={() => setMoreOpen(false)}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-surface-muted transition-colors"
-                aria-label="Schließen"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-3">
-              {moreItems.map((item) => {
-                const active = item.href === '/dashboard'
-                  ? pathname === '/dashboard'
-                  : pathname.startsWith(item.href)
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMoreOpen(false)}
-                    className={cn(
-                      'flex flex-col items-center gap-2 p-3 rounded-2xl transition-colors',
-                      active
-                        ? 'bg-brand-muted text-brand-600'
-                        : 'bg-surface-muted text-foreground hover:bg-brand-muted hover:text-brand-600'
-                    )}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    <span className="text-[10px] font-semibold text-center leading-tight">
-                      {item.label}
-                    </span>
-                  </Link>
-                )
-              })}
-            </div>
+      {/* More bottom sheet – slides up from behind the nav bar */}
+      <div
+        className={cn(
+          'fixed left-0 right-0 z-50 lg:hidden bg-surface rounded-t-3xl shadow-2xl border-t-2 border-surface-border',
+          'transition-transform duration-300 ease-out',
+          moreOpen ? 'translate-y-0' : 'translate-y-full'
+        )}
+        style={{ bottom: `calc(64px + env(safe-area-inset-bottom, 0px))` }}
+        aria-hidden={!moreOpen}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="h-1 w-10 rounded-full bg-surface-border" />
+        </div>
+
+        <div className="px-5 pt-2 pb-5">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-bold text-foreground" style={{ fontFamily: 'var(--font-syne, system-ui)' }}>
+              Mehr
+            </p>
+            <button
+              onClick={() => setMoreOpen(false)}
+              className="p-2 rounded-xl text-[var(--text-muted)] hover:bg-surface-muted active:scale-90 transition-all"
+              aria-label="Schließen"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-4 gap-3">
+            {moreItems.map((item) => {
+              const active = item.href === '/dashboard'
+                ? pathname === '/dashboard'
+                : pathname.startsWith(item.href)
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMoreOpen(false)}
+                  className={cn(
+                    'flex flex-col items-center gap-2 p-3 rounded-2xl transition-all duration-150 active:scale-90',
+                    active
+                      ? 'bg-brand-muted text-brand-600'
+                      : 'bg-surface-muted text-foreground hover:bg-brand-muted hover:text-brand-600'
+                  )}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="text-[10px] font-semibold text-center leading-tight">{item.label}</span>
+                </Link>
+              )
+            })}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Bottom nav bar */}
       <nav
@@ -314,16 +342,25 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
           <button
             onClick={() => setMoreOpen((v) => !v)}
             className={cn(
-              'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-colors relative',
+              'flex flex-col items-center justify-center gap-1 flex-1 py-2 transition-all duration-150 relative active:scale-90',
               moreOpen || moreActive ? 'text-brand-600' : 'text-[var(--text-muted)]'
             )}
             aria-label="Mehr anzeigen"
+            aria-expanded={moreOpen}
           >
             {(moreOpen || moreActive) && (
-              <span className="absolute top-1 w-1 h-1 rounded-full bg-brand-600 nav-active-dot" />
+              <span className="absolute top-0.5 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-brand-600" />
             )}
-            <Grid3X3 className={cn('h-5 w-5 transition-transform', moreOpen && 'scale-110 rotate-12')} />
-            <span className={cn('text-[10px]', (moreOpen || moreActive) ? 'font-bold' : 'font-medium')}>
+            <span className={cn(
+              'flex items-center justify-center rounded-xl transition-all duration-150',
+              moreOpen ? 'scale-110 rotate-12' : 'scale-100'
+            )}>
+              <Grid3X3 className="h-5 w-5" />
+            </span>
+            <span className={cn(
+              'text-[10px] leading-none hidden [@media(min-width:320px)]:block',
+              (moreOpen || moreActive) ? 'font-bold' : 'font-medium'
+            )}>
               Mehr
             </span>
           </button>

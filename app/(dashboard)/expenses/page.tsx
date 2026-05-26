@@ -211,8 +211,8 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Amount + Date */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      {/* Amount + Date – 2-col on mobile, 3-col on sm+ */}
+      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="exp-amount">Betrag (€)</Label>
           <Input
@@ -223,6 +223,7 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0,00"
             disabled={submitting}
+            autoComplete="off"
           />
         </div>
         <div className="space-y-1">
@@ -235,13 +236,13 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
             disabled={submitting}
           />
         </div>
-        <div className="space-y-1">
+        <div className="space-y-1 col-span-2 sm:col-span-1">
           <Label htmlFor="exp-category">Kategorie</Label>
           <select
             id="exp-category"
             value={category}
             onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
-            className="flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex h-11 w-full rounded-xl border-2 border-surface-border bg-white px-3 py-2 text-base focus:outline-none focus:border-brand-600"
             disabled={submitting}
           >
             {CATEGORIES.map((cat) => (
@@ -273,15 +274,15 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
               type="button"
               onClick={() => setPaidBy(m.id)}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                'inline-flex items-center gap-2 rounded-xl border-2 px-3 min-h-[44px] text-sm transition-all active:scale-95',
                 paidBy === m.id
                   ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-semibold'
                   : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
               )}
             >
-              <Avatar className="h-4 w-4">
+              <Avatar className="h-6 w-6">
                 {m.avatarUrl && <AvatarImage src={m.avatarUrl} alt={m.name} />}
-                <AvatarFallback className="text-[8px]">{getInitials(m.name)}</AvatarFallback>
+                <AvatarFallback className="text-[10px]">{getInitials(m.name)}</AvatarFallback>
               </Avatar>
               {m.name}{m.id === currentUserId && ' (Du)'}
             </button>
@@ -414,13 +415,13 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
         )}
       </div>
 
-      {error && <p className="text-sm text-red-600 bg-red-50 rounded p-2">{error}</p>}
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2">{error}</p>}
 
-      <div className="flex gap-2 justify-end">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={submitting}>
+      <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={submitting} className="w-full sm:w-auto min-h-[44px]">
           Abbrechen
         </Button>
-        <Button type="submit" size="sm" disabled={submitting || !amount || !description.trim()}>
+        <Button type="submit" disabled={submitting || !amount || !description.trim()} className="w-full sm:w-auto min-h-[44px]">
           {submitting ? 'Speichern...' : submitLabel}
         </Button>
       </div>
@@ -995,15 +996,17 @@ export default function ExpensesPage() {
             ) : chartData.length === 0 ? (
               <p className="text-sm text-gray-400 py-8 text-center">Keine Daten vorhanden</p>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}€`} />
-                  <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Betrag']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                  <Bar dataKey="Betrag" radius={[4, 4, 0, 0]} fill="#6366f1" />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="h-[180px] sm:h-[220px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}€`} />
+                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Betrag']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
+                    <Bar dataKey="Betrag" radius={[4, 4, 0, 0]} fill="#6366f1" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </CardContent>
         </Card>
