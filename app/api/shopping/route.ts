@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db'
 
 const createItemSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  category: z.enum(['LEBENSMITTEL', 'HAUSHALT', 'SONSTIGES']).optional(),
+  category: z.string().optional(),
   note: z.string().optional(),
 })
 
