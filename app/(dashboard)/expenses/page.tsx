@@ -146,6 +146,8 @@ function percentageSum(percentages: Record<string, string>, splitWith: string[])
 
 // ─── CategoryManager ──────────────────────────────────────────────────────────
 
+const PRESET_EMOJIS = ['🛒','🍕','🚗','🏠','🎮','🍺','💊','📚','✈️','💻','👕','🎁','🐾','💇','🎵','🏋️','🔧','📝','🎭','💡','🏖️','🎉','🍔','🌿']
+
 function CategoryManager({
   categories,
   onCreated,
@@ -173,7 +175,7 @@ function CategoryManager({
       const res = await fetch('/api/expenses/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), color, emoji: emoji.trim() || undefined }),
+        body: JSON.stringify({ name: name.trim(), color, emoji: emoji || undefined }),
       })
       const json = await res.json()
       if (!res.ok) { setError(json.error ?? 'Fehler'); return }
@@ -241,8 +243,10 @@ function CategoryManager({
         {/* Create new */}
         <form onSubmit={handleCreate} className="space-y-3">
           <p className="text-xs font-medium text-gray-600">Neue Kategorie hinzufügen</p>
-          <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
-            <div className="space-y-1">
+
+          {/* Name + Color */}
+          <div className="flex gap-2 items-end">
+            <div className="flex-1 space-y-1">
               <Label htmlFor="cat-name" className="text-xs">Name</Label>
               <Input
                 id="cat-name"
@@ -254,29 +258,50 @@ function CategoryManager({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="cat-emoji" className="text-xs">Emoji</Label>
-              <Input
-                id="cat-emoji"
-                value={emoji}
-                onChange={(e) => setEmoji(e.target.value)}
-                placeholder="🎉"
-                disabled={submitting}
-                className="h-9 w-16 text-center"
-                maxLength={4}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="cat-color" className="text-xs">Farbe</Label>
+              <Label className="text-xs">Farbe</Label>
               <input
-                id="cat-color"
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 disabled={submitting}
-                className="h-9 w-9 cursor-pointer rounded border border-gray-200"
+                className="h-9 w-9 cursor-pointer rounded border border-gray-200 p-0.5"
               />
             </div>
           </div>
+
+          {/* Emoji picker */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Emoji {emoji && <span className="ml-1 text-base">{emoji}</span>}</Label>
+            <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-gray-200 bg-gray-50">
+              {PRESET_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  onClick={() => setEmoji(emoji === e ? '' : e)}
+                  disabled={submitting}
+                  className={cn(
+                    'text-lg w-9 h-9 rounded-lg border flex items-center justify-center transition-all active:scale-90',
+                    emoji === e
+                      ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-400'
+                      : 'border-gray-200 bg-white hover:bg-gray-100'
+                  )}
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          {name && (
+            <div className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 bg-gray-50">
+              <span className="text-base w-6 text-center">{emoji || '🏷️'}</span>
+              <span className="text-sm font-medium rounded-full px-2 py-0.5 border" style={getCategoryBadgeStyle(color)}>
+                {name}
+              </span>
+            </div>
+          )}
+
           {error && <p className="text-xs text-red-600">{error}</p>}
           <Button type="submit" disabled={submitting || !name.trim()} className="w-full" size="sm">
             <Plus className="h-3.5 w-3.5 mr-1" />
@@ -724,6 +749,8 @@ export default function ExpensesPage() {
   const [expandedSettlements, setExpandedSettlements] = React.useState<Set<string>>(new Set())
   const [settlingExpenseId, setSettlingExpenseId] = React.useState<string | null>(null)
   const [showCategoryManager, setShowCategoryManager] = React.useState(false)
+  const [showSettleAll, setShowSettleAll] = React.useState(false)
+  const [settlingAll, setSettlingAll] = React.useState(false)
 
   // Filters
   const [filterCategory, setFilterCategory] = React.useState<string>('all')
@@ -897,6 +924,31 @@ export default function ExpensesPage() {
 
   const myDebts = settlements.filter((s) => s.fromUserId === myId)
   const othersDebts = settlements.filter((s) => s.toUserId === myId)
+  const myBalance = owedToMe - iOwe
+
+  const allDebtLines = React.useMemo(() => {
+    const lines: { text: string; negative: boolean }[] = []
+    myDebts.forEach((s) => lines.push({ text: `Du schuldest ${s.toUserName} ${formatCurrency(s.amount)}`, negative: true }))
+    othersDebts.forEach((s) => lines.push({ text: `${s.fromUserName} schuldet dir ${formatCurrency(s.amount)}`, negative: false }))
+    return lines
+  }, [myDebts, othersDebts])
+
+  const handleSettleAll = async () => {
+    setSettlingAll(true)
+    setShowSettleAll(false)
+    const mySettlements = settlements.filter((s) => s.fromUserId === myId || s.toUserId === myId)
+    for (const s of mySettlements) {
+      try {
+        await fetch('/api/expenses/settlements', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fromUserId: s.fromUserId, toUserId: s.toUserId, amount: s.amount, comment: 'Alle Schulden ausgeglichen' }),
+        })
+      } catch { /* ignore individual errors */ }
+    }
+    setSettlingAll(false)
+    fetchData()
+  }
 
   const memberMap = React.useMemo(
     () => new Map(members.map((m) => [m.id, m])),
@@ -948,72 +1000,100 @@ export default function ExpensesPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       )}
 
-      {/* ── Persönliche Schulden (oben, prominent) ── */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-        {/* Mir schuldet man */}
-        <Card className={cn('border-2', owedToMe > 0 ? 'border-green-200 bg-green-50/30' : 'border-gray-200')}>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium text-gray-500">Mir schuldet man</CardDescription>
-            <CardTitle className={cn('text-3xl font-bold', owedToMe > 0 ? 'text-green-600' : 'text-gray-400')}>
-              {loading ? <Skeleton className="h-9 w-28" /> : formatCurrency(owedToMe)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-4 w-32" />
-            ) : othersDebts.length > 0 ? (
-              <div className="space-y-1">
-                {othersDebts.map((s) => (
-                  <div key={`${s.fromUserId}-${s.toUserId}`} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <Avatar className="h-4 w-4">
-                        {memberMap.get(s.fromUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.fromUserId)!.avatarUrl!} />}
-                        <AvatarFallback className="text-[8px] bg-green-100 text-green-700">{getInitials(s.fromUserName)}</AvatarFallback>
-                      </Avatar>
-                      {s.fromUserName}
-                    </span>
-                    <span className="font-semibold text-green-600">{formatCurrency(s.amount)}</span>
-                  </div>
-                ))}
+      {/* ── WG-Kasse (persönliche Schuldenübersicht) ── */}
+      <Card className="border-2 border-surface-border">
+        <CardContent className="pt-4 pb-4">
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-40" />
+            </div>
+          ) : (
+            <>
+              {/* Header row */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-50 shrink-0">
+                  <Wallet className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-gray-900">WG-Kasse</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {myBalance === 0
+                      ? 'Alles ausgeglichen ✓'
+                      : myBalance > 0
+                      ? `Du bekommst ${formatCurrency(owedToMe)}`
+                      : `Du schuldest ${formatCurrency(iOwe)}`}
+                  </p>
+                </div>
+                {myBalance !== 0 && (
+                  <span className={cn('text-xl font-extrabold shrink-0', myBalance > 0 ? 'text-green-600' : 'text-red-500')}>
+                    {myBalance > 0 ? '+' : ''}{formatCurrency(Math.abs(myBalance))}
+                  </span>
+                )}
               </div>
-            ) : (
-              <p className="text-xs text-gray-400">Niemand schuldet dir etwas</p>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Ich schulde */}
-        <Card className={cn('border-2', iOwe > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-200')}>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium text-gray-500">Ich schulde gesamt</CardDescription>
-            <CardTitle className={cn('text-3xl font-bold', iOwe > 0 ? 'text-red-500' : 'text-gray-400')}>
-              {loading ? <Skeleton className="h-9 w-28" /> : formatCurrency(iOwe)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-4 w-32" />
-            ) : myDebts.length > 0 ? (
-              <div className="space-y-1">
-                {myDebts.map((s) => (
-                  <div key={`${s.fromUserId}-${s.toUserId}`} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 flex items-center gap-1">
-                      <Avatar className="h-4 w-4">
-                        {memberMap.get(s.toUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.toUserId)!.avatarUrl!} />}
-                        <AvatarFallback className="text-[8px] bg-red-100 text-red-600">{getInitials(s.toUserName)}</AvatarFallback>
-                      </Avatar>
-                      an {s.toUserName}
-                    </span>
-                    <span className="font-semibold text-red-500">{formatCurrency(s.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-400">Du schuldest niemandem etwas</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              {/* Debt lines */}
+              {allDebtLines.length > 0 && (
+                <div className="space-y-1 mb-3">
+                  {allDebtLines.map((line, i) => (
+                    <p key={i} className={cn('text-xs font-medium', line.negative ? 'text-red-600' : 'text-green-600')}>
+                      {line.text}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Settle-all button */}
+              {allDebtLines.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full h-9 text-xs font-medium"
+                  onClick={() => setShowSettleAll(true)}
+                  disabled={settlingAll}
+                >
+                  <Check className="h-3.5 w-3.5 mr-1.5" />
+                  {settlingAll ? 'Wird ausgeglichen...' : 'Alle Schulden begleichen'}
+                </Button>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Settle-All Confirmation Dialog ── */}
+      {showSettleAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900">Alle Schulden begleichen</h3>
+              <button onClick={() => setShowSettleAll(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 mb-4 space-y-1">
+              {allDebtLines.map((line, i) => (
+                <p key={i} className={cn('text-xs font-medium', line.negative ? 'text-red-600' : 'text-green-600')}>
+                  {line.text}
+                </p>
+              ))}
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Alle offenen Schulden werden als beglichen markiert. Das kann nicht rückgängig gemacht werden.
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+              <Button variant="outline" size="sm" onClick={() => setShowSettleAll(false)} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
+                Abbrechen
+              </Button>
+              <Button size="sm" onClick={handleSettleAll} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
+                <Check className="h-4 w-4 mr-1" />
+                Alle als beglichen markieren
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Add Form ── */}
       {showForm && (
