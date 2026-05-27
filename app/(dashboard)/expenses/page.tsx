@@ -385,6 +385,7 @@ interface ExpenseFormProps {
     splitWith: string[]
     splits?: Record<string, number>
     date: string
+    receiptImageUrl?: string
   }) => Promise<string | null>
   onCancel: () => void
   submitLabel?: string
@@ -404,8 +405,11 @@ function ExpenseForm({ members, categories: rawCategories, currentUserId, initia
   const [individual, setIndividual] = React.useState<Record<string, string>>(initialData?.individual ?? {})
   const [percentages, setPercentages] = React.useState<Record<string, string>>(initialData?.percentages ?? {})
   const [date, setDate] = React.useState(initialData?.date ?? todayIso())
+  const [receiptFile, setReceiptFile] = React.useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState('')
+  const receiptInputRef = React.useRef<HTMLInputElement>(null)
 
   const parsedAmount = parseFloat(amount.replace(',', '.')) || 0
 
@@ -427,8 +431,20 @@ function ExpenseForm({ members, categories: rawCategories, currentUserId, initia
     }
     setSubmitting(true)
     setError('')
+
+    let receiptImageUrl: string | undefined
+    if (receiptFile) {
+      const formData = new FormData()
+      formData.append('file', receiptFile)
+      const uploadRes = await fetch('/api/upload/receipt', { method: 'POST', body: formData })
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json()
+        receiptImageUrl = uploadData.url
+      }
+    }
+
     const splits = buildSplitsPayload(splitMode, splitWith, individual, percentages)
-    const err = await onSubmit({ amount: parsedAmount, description: description.trim(), category, paidBy, splitMode, splitWith, splits, date: new Date(date).toISOString() })
+    const err = await onSubmit({ amount: parsedAmount, description: description.trim(), category, paidBy, splitMode, splitWith, splits, date: new Date(date).toISOString(), receiptImageUrl })
     if (err) setError(err)
     setSubmitting(false)
   }
@@ -491,6 +507,50 @@ function ExpenseForm({ members, categories: rawCategories, currentUserId, initia
           placeholder="Wofür?"
           disabled={submitting}
         />
+      </div>
+
+      {/* Receipt image */}
+      <div className="space-y-1">
+        <Label>Beleg (optional)</Label>
+        <input
+          ref={receiptInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              setReceiptFile(file)
+              setReceiptPreview(URL.createObjectURL(file))
+            }
+          }}
+        />
+        {receiptPreview ? (
+          <div className="flex items-center gap-3 rounded-xl border-2 border-surface-border bg-gray-50 px-3 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={receiptPreview} alt="Beleg" className="h-12 w-12 rounded-lg object-cover shrink-0 border border-gray-200" />
+            <span className="flex-1 text-sm text-gray-700 truncate">{receiptFile?.name}</span>
+            <button
+              type="button"
+              onClick={() => { setReceiptFile(null); setReceiptPreview(null); if (receiptInputRef.current) receiptInputRef.current.value = '' }}
+              className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+              aria-label="Beleg entfernen"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => receiptInputRef.current?.click()}
+            disabled={submitting}
+            className="flex w-full items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 hover:bg-gray-100 hover:border-gray-300 transition-colors disabled:opacity-50"
+          >
+            <Receipt className="h-4 w-4 shrink-0" />
+            Kassenbon foto hochladen oder aufnehmen
+          </button>
+        )}
       </div>
 
       {/* Payer */}
