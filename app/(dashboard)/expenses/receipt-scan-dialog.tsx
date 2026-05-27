@@ -355,19 +355,28 @@ export function ReceiptScanDialog({
           {/* ── Review Stage ── */}
           {stage === 'review' && receipt && (
             <div className="space-y-4 py-2">
-              {/* Beleg-Kopf */}
-              <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2 text-sm space-y-1">
-                {receipt.shopName && (
-                  <p className="font-semibold text-gray-900">{receipt.shopName}</p>
-                )}
-                {receipt.date && (
-                  <p className="text-gray-500 text-xs">Datum: {receipt.date}</p>
-                )}
-                {receipt.total != null && (
-                  <p className="text-gray-500 text-xs">
-                    Gesamtbetrag (Beleg): {formatCurrency(receipt.total)}
-                  </p>
-                )}
+              {/* Beleg-Kopf + editierbarer Name */}
+              <div className="rounded-lg bg-gray-50 border border-gray-200 px-3 py-2.5 space-y-2">
+                <div>
+                  <Label htmlFor="receipt-description" className="text-[10px] uppercase tracking-wide text-gray-400 mb-1 block">
+                    Bezeichnung
+                  </Label>
+                  <input
+                    id="receipt-description"
+                    type="text"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="z. B. Einkauf REWE"
+                    // eslint-disable-next-line jsx-a11y/no-autofocus
+                    autoFocus
+                    className="w-full bg-transparent text-base font-semibold text-gray-900 outline-none placeholder-gray-400 border-b border-transparent focus:border-indigo-400 pb-0.5 transition-colors"
+                  />
+                </div>
+                <div className="flex gap-4 text-xs text-gray-500">
+                  {receipt.shopName && <span>{receipt.shopName}</span>}
+                  {receipt.date && <span>📅 {receipt.date}</span>}
+                  {receipt.total != null && <span>Gesamt: {formatCurrency(receipt.total)}</span>}
+                </div>
               </div>
 
               {items.length === 0 ? (
@@ -457,18 +466,6 @@ export function ReceiptScanDialog({
 
               {/* Ausgaben-Details */}
               <div className="space-y-3 border-t border-gray-100 pt-3">
-                <div>
-                  <Label htmlFor="receipt-description" className="text-xs text-gray-600 mb-1 block">
-                    Beschreibung
-                  </Label>
-                  <Input
-                    id="receipt-description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="z. B. Einkauf REWE"
-                  />
-                </div>
-
                 <div>
                   <Label className="text-xs text-gray-600 mb-1 block">Kategorie</Label>
                   <div className="flex flex-wrap gap-1.5">
