@@ -10,3 +10,4 @@ const supabaseAnonKey =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export const AVATAR_BUCKET = 'avatars'
+export const RECEIPT_BUCKET = 'receipts'

@@ -28,7 +28,9 @@ import {
   Settings,
   Tag,
   Zap,
+  ScanLine,
 } from 'lucide-react'
+import { ReceiptScanDialog } from './receipt-scan-dialog'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,6 +74,7 @@ interface Expense {
   settledAt: string | null
   createdAt: string
   paidByUser: SimpleUser
+  receiptImageUrl: string | null
 }
 
 interface NetSettlement {
@@ -382,6 +385,7 @@ interface ExpenseFormProps {
     splitWith: string[]
     splits?: Record<string, number>
     date: string
+    receiptImageUrl?: string
   }) => Promise<string | null>
   onCancel: () => void
   submitLabel?: string
@@ -401,8 +405,11 @@ function ExpenseForm({ members, categories: rawCategories, currentUserId, initia
   const [individual, setIndividual] = React.useState<Record<string, string>>(initialData?.individual ?? {})
   const [percentages, setPercentages] = React.useState<Record<string, string>>(initialData?.percentages ?? {})
   const [date, setDate] = React.useState(initialData?.date ?? todayIso())
+  const [receiptFile, setReceiptFile] = React.useState<File | null>(null)
+  const [receiptPreview, setReceiptPreview] = React.useState<string | null>(null)
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState('')
+  const receiptInputRef = React.useRef<HTMLInputElement>(null)
 
   const parsedAmount = parseFloat(amount.replace(',', '.')) || 0
 
@@ -424,8 +431,20 @@ function ExpenseForm({ members, categories: rawCategories, currentUserId, initia
     }
     setSubmitting(true)
     setError('')
+
+    let receiptImageUrl: string | undefined
+    if (receiptFile) {
+      const formData = new FormData()
+      formData.append('file', receiptFile)
+      const uploadRes = await fetch('/api/upload/receipt', { method: 'POST', body: formData })
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json()
+        receiptImageUrl = uploadData.url
+      }
+    }
+
     const splits = buildSplitsPayload(splitMode, splitWith, individual, percentages)
-    const err = await onSubmit({ amount: parsedAmount, description: description.trim(), category, paidBy, splitMode, splitWith, splits, date: new Date(date).toISOString() })
+    const err = await onSubmit({ amount: parsedAmount, description: description.trim(), category, paidBy, splitMode, splitWith, splits, date: new Date(date).toISOString(), receiptImageUrl })
     if (err) setError(err)
     setSubmitting(false)
   }
@@ -488,6 +507,50 @@ function ExpenseForm({ members, categories: rawCategories, currentUserId, initia
           placeholder="Wofür?"
           disabled={submitting}
         />
+      </div>
+
+      {/* Receipt image */}
+      <div className="space-y-1">
+        <Label>Beleg (optional)</Label>
+        <input
+          ref={receiptInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (file) {
+              setReceiptFile(file)
+              setReceiptPreview(URL.createObjectURL(file))
+            }
+          }}
+        />
+        {receiptPreview ? (
+          <div className="flex items-center gap-3 rounded-xl border-2 border-surface-border bg-gray-50 px-3 py-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={receiptPreview} alt="Beleg" className="h-12 w-12 rounded-lg object-cover shrink-0 border border-gray-200" />
+            <span className="flex-1 text-sm text-gray-700 truncate">{receiptFile?.name}</span>
+            <button
+              type="button"
+              onClick={() => { setReceiptFile(null); setReceiptPreview(null); if (receiptInputRef.current) receiptInputRef.current.value = '' }}
+              className="text-gray-400 hover:text-red-500 transition-colors shrink-0"
+              aria-label="Beleg entfernen"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => receiptInputRef.current?.click()}
+            disabled={submitting}
+            className="flex w-full items-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500 hover:bg-gray-100 hover:border-gray-300 transition-colors disabled:opacity-50"
+          >
+            <Receipt className="h-4 w-4 shrink-0" />
+            Kassenbon foto hochladen oder aufnehmen
+          </button>
+        )}
       </div>
 
       {/* Payer */}
@@ -796,6 +859,7 @@ export default function ExpensesPage() {
   }, [myId])
 
   const [showForm, setShowForm] = React.useState(false)
+  const [showReceiptScan, setShowReceiptScan] = React.useState(false)
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [settlingSettlement, setSettlingSettlement] = React.useState<NetSettlement | null>(null)
@@ -1061,6 +1125,10 @@ export default function ExpensesPage() {
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             <span className="hidden sm:inline ml-1">Aktualisieren</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowReceiptScan(true)}>
+            <ScanLine className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1">Scannen</span>
           </Button>
           <Button size="sm" onClick={() => setShowForm((v) => !v)}>
             <Plus className="h-4 w-4" />
@@ -1523,7 +1591,21 @@ export default function ExpensesPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
+                        {expense.receiptImageUrl && (
+                          <a
+                            href={expense.receiptImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Beleg anzeigen"
+                            className="shrink-0 text-indigo-400 hover:text-indigo-600 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Receipt className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
                         <span className="text-xs text-gray-400">{expense.paidByUser.name} bezahlt</span>
                         <Separator orientation="vertical" className="h-3" />
@@ -1666,6 +1748,15 @@ export default function ExpensesPage() {
           onClose={() => setShowCategoryManager(false)}
         />
       )}
+
+      <ReceiptScanDialog
+        open={showReceiptScan}
+        onOpenChange={setShowReceiptScan}
+        members={members}
+        currentUserId={myId}
+        categories={categories.length > 0 ? categories : FALLBACK_CATEGORIES}
+        onExpenseCreated={fetchData}
+      />
     </div>
   )
 }
