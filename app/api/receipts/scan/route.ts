@@ -8,24 +8,32 @@ const SYSTEM_PROMPT = `Du bist ein präziser Kassenbon-Extraktor. Analysiere das
 Schema:
 {
   "shopName": string | null,
-  "date": string | null,          // Format: YYYY-MM-DD
+  "date": string | null,
   "items": [
     {
-      "name": string,              // Artikelname, bereinigt
-      "quantity": number,          // Standard: 1
-      "unitPrice": number,         // Einzelpreis in Euro
-      "totalPrice": number         // Gesamtpreis des Postens in Euro
+      "name": string,
+      "quantity": number,
+      "unitPrice": number,
+      "totalPrice": number
     }
   ],
-  "total": number | null           // Endbetrag in Euro
+  "total": number | null
 }
 
 Regeln:
 - Nur echte Artikel in "items" – keine Summen, Steuern, Zahlungsmethoden, Pfand, Rabatte
-- Artikelnamen auf Deutsch bereinigen, Abkürzungen aufschlüsseln wenn möglich
-- Preise als Dezimalzahlen (Punkt als Trennzeichen, z.B. 1.29)
+- Artikelnamen bereinigen, Abkürzungen aufschlüsseln wenn möglich
+- Preise als Dezimalzahlen mit Punkt (z.B. 1.29)
 - Datum im ISO-Format YYYY-MM-DD
-- Bei unleserlichen Angaben: null setzen`
+- Bei unleserlichen Angaben: null`
+
+function extractJson(raw: string): string {
+  // Find outermost { } – handles markdown fences and extra text around JSON
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start === -1 || end === -1 || end <= start) throw new Error('Kein JSON-Objekt gefunden')
+  return raw.slice(start, end + 1)
+}
 
 export async function POST(request: Request) {
   const auth = await requireWgSession()
@@ -33,56 +41,42 @@ export async function POST(request: Request) {
 
   const formData = await request.formData()
   const file = formData.get('image') as File | null
-  if (!file) {
-    return Response.json({ error: 'Kein Bild übermittelt.' }, { status: 400 })
-  }
-
-  const maxSize = 10 * 1024 * 1024
-  if (file.size > maxSize) {
-    return Response.json({ error: 'Bild zu groß (max. 10 MB).' }, { status: 400 })
-  }
+  if (!file) return Response.json({ error: 'Kein Bild übermittelt.' }, { status: 400 })
+  if (file.size > 10 * 1024 * 1024) return Response.json({ error: 'Bild zu groß (max. 10 MB).' }, { status: 400 })
 
   const arrayBuffer = await file.arrayBuffer()
   const base64 = Buffer.from(arrayBuffer).toString('base64')
-
-  const mediaType = (file.type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
+  const mediaType = (['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)
+    ? file.type
+    : 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'
 
   try {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: { type: 'base64', media_type: mediaType, data: base64 },
-            },
-            {
-              type: 'text',
-              text: 'Extrahiere alle Daten aus diesem Kassenbon als JSON.',
-            },
-          ],
-        },
-      ],
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: 'Extrahiere alle Daten aus diesem Kassenbon als JSON.' },
+        ],
+      }],
     })
 
-    const raw = message.content[0].type === 'text' ? message.content[0].text.trim() : ''
-    const jsonText = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+    const raw = message.content[0].type === 'text' ? message.content[0].text : ''
 
-    let parsed
+    let parsed: unknown
     try {
-      parsed = JSON.parse(jsonText)
-    } catch {
-      return Response.json({ error: 'Antwort konnte nicht geparst werden.', raw }, { status: 500 })
+      parsed = JSON.parse(extractJson(raw))
+    } catch (e) {
+      console.error('JSON parse failed, raw response:', raw)
+      return Response.json({ error: 'Antwort konnte nicht geparst werden: ' + (e instanceof Error ? e.message : String(e)), raw }, { status: 500 })
     }
 
     return Response.json(parsed)
   } catch (err) {
     console.error('Claude Vision error:', err)
-    const msg = err instanceof Error ? err.message : 'Unbekannter Fehler'
-    return Response.json({ error: 'OCR fehlgeschlagen: ' + msg }, { status: 500 })
+    return Response.json({ error: 'OCR fehlgeschlagen: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler') }, { status: 500 })
   }
 }
