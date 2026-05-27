@@ -6,7 +6,7 @@ import { prisma } from '@/lib/db'
 const updateExpenseSchema = z.object({
   amount: z.number().positive().optional(),
   description: z.string().min(1).optional(),
-  category: z.enum(['LEBENSMITTEL', 'HAUSHALT', 'MIETE_NEBENKOSTEN', 'SONSTIGES', 'SKAT', 'DOPPELKOPF']).optional(),
+  category: z.string().min(1).optional(),
   paidBy: z.string().optional(),
   splitWith: z.array(z.string()).min(1).optional(),
   splitMode: z.enum(['EQUAL', 'INDIVIDUAL', 'PERCENTAGE']).optional(),

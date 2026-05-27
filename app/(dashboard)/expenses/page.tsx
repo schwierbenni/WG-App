@@ -23,9 +23,10 @@ import {
   History,
   X,
   Check,
-  TrendingDown,
   ChevronDown,
   ChevronUp,
+  Settings,
+  Tag,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,8 +38,17 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { cn, formatDate, formatCurrency, getInitials } from '@/lib/utils'
 
-type ExpenseCategory = 'LEBENSMITTEL' | 'HAUSHALT' | 'MIETE_NEBENKOSTEN' | 'SONSTIGES' | 'SKAT' | 'DOPPELKOPF'
 type SplitMode = 'EQUAL' | 'INDIVIDUAL' | 'PERCENTAGE'
+
+interface WGExpenseCategory {
+  id: string
+  name: string
+  slug: string
+  color: string
+  emoji: string | null
+  isDefault: boolean
+  sortOrder: number
+}
 
 interface SimpleUser {
   id: string
@@ -51,7 +61,7 @@ interface Expense {
   id: string
   amount: number
   description: string
-  category: ExpenseCategory
+  category: string
   paidBy: string
   splitWith: string[]
   splitMode: SplitMode
@@ -81,26 +91,6 @@ interface SettlementRecord {
   toUser: SimpleUser
 }
 
-const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  LEBENSMITTEL: 'Lebensmittel',
-  HAUSHALT: 'Haushalt',
-  MIETE_NEBENKOSTEN: 'Miete & NK',
-  SONSTIGES: 'Sonstiges',
-  SKAT: 'Skat',
-  DOPPELKOPF: 'Doppelkopf',
-}
-
-const CATEGORY_COLORS: Record<ExpenseCategory, string> = {
-  LEBENSMITTEL: 'bg-green-100 text-green-700',
-  HAUSHALT: 'bg-blue-100 text-blue-700',
-  MIETE_NEBENKOSTEN: 'bg-purple-100 text-purple-700',
-  SONSTIGES: 'bg-gray-100 text-gray-600',
-  SKAT: 'bg-amber-100 text-amber-700',
-  DOPPELKOPF: 'bg-orange-100 text-orange-700',
-}
-
-const CATEGORIES: ExpenseCategory[] = ['LEBENSMITTEL', 'HAUSHALT', 'MIETE_NEBENKOSTEN', 'SONSTIGES']
-
 const SPLIT_MODES: SplitMode[] = ['EQUAL', 'INDIVIDUAL', 'PERCENTAGE']
 const SPLIT_MODE_LABELS: Record<SplitMode, string> = {
   EQUAL: 'Gleich',
@@ -110,6 +100,14 @@ const SPLIT_MODE_LABELS: Record<SplitMode, string> = {
 
 function todayIso() {
   return new Date().toISOString().split('T')[0]
+}
+
+function getCategoryBadgeStyle(color: string): React.CSSProperties {
+  return {
+    backgroundColor: `${color}20`,
+    color: color,
+    borderColor: `${color}50`,
+  }
 }
 
 function buildSplitsPayload(
@@ -139,15 +137,160 @@ function percentageSum(percentages: Record<string, string>, splitWith: string[])
   return splitWith.reduce((s, uid) => s + (parseFloat(percentages[uid] ?? '0') || 0), 0)
 }
 
+// ─── CategoryManager ──────────────────────────────────────────────────────────
+
+function CategoryManager({
+  categories,
+  onCreated,
+  onDeleted,
+  onClose,
+}: {
+  categories: WGExpenseCategory[]
+  onCreated: (cat: WGExpenseCategory) => void
+  onDeleted: (id: string) => void
+  onClose: () => void
+}) {
+  const [name, setName] = React.useState('')
+  const [color, setColor] = React.useState('#6366f1')
+  const [emoji, setEmoji] = React.useState('')
+  const [submitting, setSubmitting] = React.useState(false)
+  const [error, setError] = React.useState('')
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const res = await fetch('/api/expenses/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), color, emoji: emoji.trim() || undefined }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setError(json.error ?? 'Fehler'); return }
+      onCreated(json.category)
+      setName('')
+      setEmoji('')
+    } catch {
+      setError('Netzwerkfehler')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeletingId(id)
+    try {
+      await fetch(`/api/expenses/categories/${id}`, { method: 'DELETE' })
+      onDeleted(id)
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl my-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Tag className="h-4 w-4 text-indigo-500" />
+            Kategorien verwalten
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Existing categories */}
+        <div className="space-y-1.5 mb-4 max-h-48 overflow-y-auto">
+          {categories.map((cat) => (
+            <div key={cat.id} className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 bg-gray-50">
+              <span className="text-base w-6 text-center">{cat.emoji ?? '🏷️'}</span>
+              <span
+                className="flex-1 text-sm font-medium rounded-full px-2 py-0.5 border"
+                style={getCategoryBadgeStyle(cat.color)}
+              >
+                {cat.name}
+              </span>
+              {cat.isDefault ? (
+                <span className="text-[10px] text-gray-400">Standard</span>
+              ) : (
+                <button
+                  onClick={() => handleDelete(cat.id)}
+                  disabled={deletingId === cat.id}
+                  className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <Separator className="mb-4" />
+
+        {/* Create new */}
+        <form onSubmit={handleCreate} className="space-y-3">
+          <p className="text-xs font-medium text-gray-600">Neue Kategorie hinzufügen</p>
+          <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
+            <div className="space-y-1">
+              <Label htmlFor="cat-name" className="text-xs">Name</Label>
+              <Input
+                id="cat-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="z.B. Freizeit"
+                disabled={submitting}
+                className="h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="cat-emoji" className="text-xs">Emoji</Label>
+              <Input
+                id="cat-emoji"
+                value={emoji}
+                onChange={(e) => setEmoji(e.target.value)}
+                placeholder="🎉"
+                disabled={submitting}
+                className="h-9 w-16 text-center"
+                maxLength={4}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="cat-color" className="text-xs">Farbe</Label>
+              <input
+                id="cat-color"
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                disabled={submitting}
+                className="h-9 w-9 cursor-pointer rounded border border-gray-200"
+              />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <Button type="submit" disabled={submitting || !name.trim()} className="w-full" size="sm">
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            {submitting ? 'Wird erstellt...' : 'Kategorie erstellen'}
+          </Button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── ExpenseForm ──────────────────────────────────────────────────────────────
 
 interface ExpenseFormProps {
   members: SimpleUser[]
+  categories: WGExpenseCategory[]
   currentUserId: string
   initialData?: {
     amount: string
     description: string
-    category: ExpenseCategory
+    category: string
     paidBy: string
     splitMode: SplitMode
     splitWith: string[]
@@ -158,7 +301,7 @@ interface ExpenseFormProps {
   onSubmit: (data: {
     amount: number
     description: string
-    category: ExpenseCategory
+    category: string
     paidBy: string
     splitMode: SplitMode
     splitWith: string[]
@@ -169,10 +312,11 @@ interface ExpenseFormProps {
   submitLabel?: string
 }
 
-function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, submitLabel = 'Speichern' }: ExpenseFormProps) {
+function ExpenseForm({ members, categories, currentUserId, initialData, onSubmit, onCancel, submitLabel = 'Speichern' }: ExpenseFormProps) {
+  const defaultCategory = categories.find((c) => c.slug === 'SONSTIGES')?.slug ?? categories[0]?.slug ?? 'SONSTIGES'
   const [amount, setAmount] = React.useState(initialData?.amount ?? '')
   const [description, setDescription] = React.useState(initialData?.description ?? '')
-  const [category, setCategory] = React.useState<ExpenseCategory>(initialData?.category ?? 'SONSTIGES')
+  const [category, setCategory] = React.useState(initialData?.category ?? defaultCategory)
   const [paidBy, setPaidBy] = React.useState(initialData?.paidBy ?? currentUserId)
   const [splitMode, setSplitMode] = React.useState<SplitMode>(initialData?.splitMode ?? 'EQUAL')
   const [splitWith, setSplitWith] = React.useState<string[]>(
@@ -215,7 +359,7 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Amount + Date – 2-col on mobile, 3-col on sm+ */}
+      {/* Amount + Date + Category */}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="exp-amount">Betrag (€)</Label>
@@ -245,12 +389,14 @@ function ExpenseForm({ members, currentUserId, initialData, onSubmit, onCancel, 
           <select
             id="exp-category"
             value={category}
-            onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
+            onChange={(e) => setCategory(e.target.value)}
             className="flex h-11 w-full rounded-xl border-2 border-surface-border bg-white px-3 py-2 text-base focus:outline-none focus:border-brand-600"
             disabled={submitting}
           >
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.slug}>
+                {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
+              </option>
             ))}
           </select>
         </div>
@@ -476,9 +622,11 @@ function SettleDialog({
             disabled={loading}
           />
         </div>
-        <div className="flex gap-2 justify-end">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={loading}>Abbrechen</Button>
-          <Button size="sm" onClick={handleConfirm} disabled={loading}>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={loading} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
+            Abbrechen
+          </Button>
+          <Button size="sm" onClick={handleConfirm} disabled={loading} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
             <Check className="h-4 w-4 mr-1" />
             {loading ? 'Wird markiert...' : 'Als beglichen markieren'}
           </Button>
@@ -493,12 +641,14 @@ function SettleDialog({
 function EditDialog({
   expense,
   members,
+  categories,
   currentUserId,
   onSave,
   onClose,
 }: {
   expense: Expense
   members: SimpleUser[]
+  categories: WGExpenseCategory[]
   currentUserId: string
   onSave: (id: string, data: Parameters<ExpenseFormProps['onSubmit']>[0]) => Promise<string | null>
   onClose: () => void
@@ -533,6 +683,7 @@ function EditDialog({
         </div>
         <ExpenseForm
           members={members}
+          categories={categories}
           currentUserId={currentUserId}
           initialData={initialData}
           onSubmit={(data) => onSave(expense.id, data)}
@@ -554,6 +705,7 @@ export default function ExpensesPage() {
   const [settlements, setSettlements] = React.useState<NetSettlement[]>([])
   const [settlementHistory, setSettlementHistory] = React.useState<SettlementRecord[]>([])
   const [members, setMembers] = React.useState<SimpleUser[]>([])
+  const [categories, setCategories] = React.useState<WGExpenseCategory[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
 
@@ -563,6 +715,7 @@ export default function ExpensesPage() {
   const [settlingSettlement, setSettlingSettlement] = React.useState<NetSettlement | null>(null)
   const [expandedSettlements, setExpandedSettlements] = React.useState<Set<string>>(new Set())
   const [settlingExpenseId, setSettlingExpenseId] = React.useState<string | null>(null)
+  const [showCategoryManager, setShowCategoryManager] = React.useState(false)
 
   // Filters
   const [filterCategory, setFilterCategory] = React.useState<string>('all')
@@ -573,23 +726,26 @@ export default function ExpensesPage() {
     setLoading(true)
     setError('')
     try {
-      const [expRes, settleRes, usersRes, historyRes] = await Promise.all([
+      const [expRes, settleRes, usersRes, historyRes, catRes] = await Promise.all([
         fetch('/api/expenses'),
         fetch('/api/expenses/settlements'),
         fetch('/api/users'),
         fetch('/api/expenses/settlements/history'),
+        fetch('/api/expenses/categories'),
       ])
       if (!expRes.ok) throw new Error('Fehler beim Laden der Ausgaben')
-      const [expData, settleData, usersData, historyData] = await Promise.all([
+      const [expData, settleData, usersData, historyData, catData] = await Promise.all([
         expRes.json(),
         settleRes.ok ? settleRes.json() : { settlements: [] },
         usersRes.ok ? usersRes.json() : { users: [] },
         historyRes.ok ? historyRes.json() : { settlements: [] },
+        catRes.ok ? catRes.json() : { categories: [] },
       ])
       setExpenses(expData.expenses ?? [])
       setSettlements(settleData.settlements ?? [])
       setMembers(usersData.users ?? [])
       setSettlementHistory(historyData.settlements ?? [])
+      setCategories(catData.categories ?? [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -682,14 +838,16 @@ export default function ExpensesPage() {
     })
   }
 
-  // ── Helper: share of a given user in a given expense ──
+  const getCategoryBySlug = React.useCallback((slug: string): WGExpenseCategory | undefined => {
+    return categories.find((c) => c.slug === slug)
+  }, [categories])
+
   const getShareForUser = (expense: Expense, userId: string): number => {
     if (expense.splitMode === 'INDIVIDUAL') return expense.splits?.[userId] ?? 0
     if (expense.splitMode === 'PERCENTAGE') return expense.amount * ((expense.splits?.[userId] ?? 0) / 100)
     return expense.amount / expense.splitWith.length
   }
 
-  // ── Helper: all unsettled expenses between two users ──
   const getExpensesBetween = (userA: string, userB: string): Expense[] =>
     expenses.filter(
       (e) =>
@@ -698,7 +856,6 @@ export default function ExpensesPage() {
           (e.paidBy === userB && e.splitWith.includes(userA)))
     )
 
-  // Filtered expenses for history
   const filteredExpenses = React.useMemo(() => {
     return expenses.filter((e) => {
       if (filterCategory !== 'all' && e.category !== filterCategory) return false
@@ -718,11 +875,11 @@ export default function ExpensesPage() {
   }, [expenses, filterCategory, filterPeriod, filterPerson])
 
   const chartData = React.useMemo(() => {
-    return CATEGORIES.map((cat) => ({
-      name: CATEGORY_LABELS[cat],
-      Betrag: expenses.filter((e) => e.category === cat).reduce((sum, e) => sum + e.amount, 0),
+    return categories.map((cat) => ({
+      name: cat.name,
+      Betrag: expenses.filter((e) => e.category === cat.slug).reduce((sum, e) => sum + e.amount, 0),
     })).filter((d) => d.Betrag > 0)
-  }, [expenses])
+  }, [expenses, categories])
 
   const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0)
   const myPaidExpenses = expenses.filter((e) => e.paidBy === myId)
@@ -783,50 +940,69 @@ export default function ExpensesPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       )}
 
-      {/* ── Summary Cards ── */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      {/* ── Persönliche Schulden (oben, prominent) ── */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+        {/* Mir schuldet man */}
+        <Card className={cn('border-2', owedToMe > 0 ? 'border-green-200 bg-green-50/30' : 'border-gray-200')}>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Gesamt WG</CardDescription>
-            <CardTitle className="text-2xl font-bold text-indigo-600">
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(totalAmount)}
+            <CardDescription className="text-xs font-medium text-gray-500">Mir schuldet man</CardDescription>
+            <CardTitle className={cn('text-3xl font-bold', owedToMe > 0 ? 'text-green-600' : 'text-gray-400')}>
+              {loading ? <Skeleton className="h-9 w-28" /> : formatCurrency(owedToMe)}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-gray-400">{expenses.length} Ausgaben</p>
+            {loading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : othersDebts.length > 0 ? (
+              <div className="space-y-1">
+                {othersDebts.map((s) => (
+                  <div key={`${s.fromUserId}-${s.toUserId}`} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 flex items-center gap-1">
+                      <Avatar className="h-4 w-4">
+                        {memberMap.get(s.fromUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.fromUserId)!.avatarUrl!} />}
+                        <AvatarFallback className="text-[8px] bg-green-100 text-green-700">{getInitials(s.fromUserName)}</AvatarFallback>
+                      </Avatar>
+                      {s.fromUserName}
+                    </span>
+                    <span className="font-semibold text-green-600">{formatCurrency(s.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">Niemand schuldet dir etwas</p>
+            )}
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Ich schulde */}
+        <Card className={cn('border-2', iOwe > 0 ? 'border-red-200 bg-red-50/30' : 'border-gray-200')}>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Meine Zahlungen</CardDescription>
-            <CardTitle className="text-2xl font-bold text-purple-600">
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(myPaidTotal)}
+            <CardDescription className="text-xs font-medium text-gray-500">Ich schulde gesamt</CardDescription>
+            <CardTitle className={cn('text-3xl font-bold', iOwe > 0 ? 'text-red-500' : 'text-gray-400')}>
+              {loading ? <Skeleton className="h-9 w-28" /> : formatCurrency(iOwe)}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-gray-400">{myPaidExpenses.length} Ausgaben bezahlt</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Ich schulde</CardDescription>
-            <CardTitle className={cn('text-2xl font-bold', iOwe > 0 ? 'text-red-500' : 'text-gray-400')}>
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(iOwe)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-gray-400">{myDebts.length} offene Posten</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Mir schuldet man</CardDescription>
-            <CardTitle className={cn('text-2xl font-bold', owedToMe > 0 ? 'text-green-600' : 'text-gray-400')}>
-              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(owedToMe)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-gray-400">{othersDebts.length} offene Posten</p>
+            {loading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : myDebts.length > 0 ? (
+              <div className="space-y-1">
+                {myDebts.map((s) => (
+                  <div key={`${s.fromUserId}-${s.toUserId}`} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 flex items-center gap-1">
+                      <Avatar className="h-4 w-4">
+                        {memberMap.get(s.toUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.toUserId)!.avatarUrl!} />}
+                        <AvatarFallback className="text-[8px] bg-red-100 text-red-600">{getInitials(s.toUserName)}</AvatarFallback>
+                      </Avatar>
+                      an {s.toUserName}
+                    </span>
+                    <span className="font-semibold text-red-500">{formatCurrency(s.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400">Du schuldest niemandem etwas</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -843,6 +1019,7 @@ export default function ExpensesPage() {
           <CardContent>
             <ExpenseForm
               members={members}
+              categories={categories}
               currentUserId={myId}
               onSubmit={handleAdd}
               onCancel={() => setShowForm(false)}
@@ -859,7 +1036,7 @@ export default function ExpensesPage() {
               <Wallet className="h-5 w-5 text-indigo-500" />
               Schuldenausgleich
             </CardTitle>
-            <CardDescription>Minimale Transaktionen (Greedy-Algorithmus)</CardDescription>
+            <CardDescription>Minimale Transaktionen</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -879,46 +1056,53 @@ export default function ExpensesPage() {
 
                   return (
                     <div key={key} className={cn('rounded-lg border overflow-hidden', isMyDebt ? 'border-red-200' : isOwedToMe ? 'border-green-200' : 'border-gray-200')}>
-                      {/* Settlement header row */}
-                      <div className={cn('flex items-center gap-2 p-3', isMyDebt ? 'bg-red-50' : isOwedToMe ? 'bg-green-50' : 'bg-white')}>
-                        <button
-                          onClick={() => toggleSettlementExpand(key)}
-                          className="flex items-center gap-2 flex-1 min-w-0 text-left"
-                        >
-                          {isExpanded
-                            ? <ChevronUp className="h-3.5 w-3.5 text-gray-400 shrink-0" />
-                            : <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
+                      {/* Settlement header row - mobile optimized */}
+                      <div className={cn('p-3', isMyDebt ? 'bg-red-50' : isOwedToMe ? 'bg-green-50' : 'bg-white')}>
+                        {/* Top row: names + amount */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <button
+                            onClick={() => toggleSettlementExpand(key)}
+                            className="shrink-0 p-0.5"
+                          >
+                            {isExpanded
+                              ? <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
+                              : <ChevronDown className="h-3.5 w-3.5 text-gray-400" />}
+                          </button>
+                          {/* From */}
                           <Avatar className="h-6 w-6 shrink-0">
                             {memberMap.get(s.fromUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.fromUserId)!.avatarUrl!} alt={s.fromUserName} />}
                             <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.fromUserName)}</AvatarFallback>
                           </Avatar>
-                          <span className={cn('text-sm font-medium truncate', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
+                          <span className={cn('text-sm font-medium min-w-0 truncate max-w-[5rem] sm:max-w-none', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
                             {isMyDebt ? 'Du' : s.fromUserName}
                           </span>
-                          <ArrowRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                          <ArrowRight className="h-3 w-3 text-gray-400 shrink-0" />
+                          {/* To */}
                           <Avatar className="h-6 w-6 shrink-0">
                             {memberMap.get(s.toUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.toUserId)!.avatarUrl!} alt={s.toUserName} />}
                             <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.toUserName)}</AvatarFallback>
                           </Avatar>
-                          <span className={cn('text-sm font-medium truncate', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
+                          <span className={cn('text-sm font-medium min-w-0 truncate max-w-[5rem] sm:max-w-none flex-1', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
                             {isOwedToMe ? 'Dir' : s.toUserName}
                           </span>
-                        </button>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <span className={cn('font-semibold text-sm', isMyDebt ? 'text-red-600' : isOwedToMe ? 'text-green-600' : 'text-gray-700')}>
+                          <span className={cn('font-semibold text-sm shrink-0', isMyDebt ? 'text-red-600' : isOwedToMe ? 'text-green-600' : 'text-gray-700')}>
                             {formatCurrency(s.amount)}
                           </span>
-                          {(isMyDebt || isOwedToMe) && (
+                        </div>
+                        {/* Bottom row: settle button (full width on mobile) */}
+                        {(isMyDebt || isOwedToMe) && (
+                          <div className="mt-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-xs px-2"
+                              className="h-7 text-xs w-full sm:w-auto"
                               onClick={() => setSettlingSettlement(s)}
                             >
+                              <Check className="h-3 w-3 mr-1" />
                               Alles begleichen
                             </Button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Expanded: individual expenses */}
@@ -928,9 +1112,6 @@ export default function ExpensesPage() {
                             <p className="text-xs text-gray-400 px-4 py-3 text-center">Keine einzelnen Ausgaben gefunden</p>
                           ) : (
                             pairExpenses.map((exp) => {
-                              const expPaidByMe = exp.paidBy === myId
-                              const otherUserId = s.fromUserId === myId ? s.toUserId : s.fromUserId
-                              const otherUserName = s.fromUserId === myId ? s.toUserName : s.fromUserName
                               const relevantUserId = exp.paidBy === s.toUserId ? s.fromUserId : s.toUserId
                               const shareAmount = getShareForUser(exp, relevantUserId)
                               const isSettling = settlingExpenseId === exp.id
@@ -949,8 +1130,8 @@ export default function ExpensesPage() {
                                     {formatCurrency(shareAmount)}
                                     <span className="text-gray-400 font-normal">
                                       {exp.paidBy === s.toUserId
-                                        ? ` (${s.fromUserName === 'Du' || s.fromUserId === myId ? 'dein' : `${s.fromUserName}s`} Anteil)`
-                                        : ` (${s.toUserName === 'Dir' || s.toUserId === myId ? 'dein' : `${s.toUserName}s`} Anteil)`}
+                                        ? ` (${s.fromUserId === myId ? 'dein' : `${s.fromUserName}s`} Anteil)`
+                                        : ` (${s.toUserId === myId ? 'dein' : `${s.toUserName}s`} Anteil)`}
                                     </span>
                                   </span>
                                   <div className="flex gap-1 shrink-0">
@@ -1016,6 +1197,32 @@ export default function ExpensesPage() {
         </Card>
       </div>
 
+      {/* ── WG-Gesamtübersicht (sekundär) ── */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-medium">Gesamt WG (alle Ausgaben)</CardDescription>
+            <CardTitle className="text-2xl font-bold text-indigo-600">
+              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(totalAmount)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-gray-400">{expenses.length} Ausgaben</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-medium">Meine Zahlungen (vorgestreckt)</CardDescription>
+            <CardTitle className="text-2xl font-bold text-purple-600">
+              {loading ? <Skeleton className="h-8 w-24" /> : formatCurrency(myPaidTotal)}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-gray-400">{myPaidExpenses.length} Ausgaben bezahlt</p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* ── Ausgaben-Historie ── */}
       <Card>
         <CardHeader>
@@ -1027,6 +1234,15 @@ export default function ExpensesPage() {
               </CardTitle>
               <CardDescription>Alle WG-Ausgaben · {filteredExpenses.length} von {expenses.length} angezeigt</CardDescription>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCategoryManager(true)}
+              className="shrink-0 text-xs"
+            >
+              <Settings className="h-3.5 w-3.5 mr-1" />
+              Kategorien
+            </Button>
           </div>
 
           {/* Filters */}
@@ -1046,7 +1262,11 @@ export default function ExpensesPage() {
               className="h-8 rounded-md border border-gray-200 bg-white px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             >
               <option value="all">Alle Kategorien</option>
-              {CATEGORIES.map((cat) => <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>)}
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.slug}>
+                  {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
+                </option>
+              ))}
             </select>
             <select
               value={filterPerson}
@@ -1089,11 +1309,10 @@ export default function ExpensesPage() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {filteredExpenses.map((expense) => {
-                const canEdit = true
-                const canDelete = true
                 const isDeleting = deletingId === expense.id
                 const isSettled = !!expense.settledAt
                 const splitDetail = getExpenseSplitDetail(expense)
+                const cat = getCategoryBySlug(expense.category)
                 return (
                   <li key={expense.id} className={cn('flex items-start gap-3 px-6 py-3 group hover:bg-gray-50', isSettled && 'opacity-60')}>
                     <Avatar className="h-8 w-8 shrink-0 mt-0.5">
@@ -1123,33 +1342,38 @@ export default function ExpensesPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <Badge className={cn(CATEGORY_COLORS[expense.category], 'hidden sm:inline-flex')} variant="outline">
-                        {CATEGORY_LABELS[expense.category]}
-                      </Badge>
+                      {cat ? (
+                        <Badge
+                          className="hidden sm:inline-flex border text-xs"
+                          style={getCategoryBadgeStyle(cat.color)}
+                        >
+                          {cat.emoji && <span className="mr-1">{cat.emoji}</span>}
+                          {cat.name}
+                        </Badge>
+                      ) : (
+                        <Badge className="hidden sm:inline-flex bg-gray-100 text-gray-600 border-gray-200" variant="outline">
+                          {expense.category}
+                        </Badge>
+                      )}
                       <span className="font-semibold text-sm text-gray-900 ml-1">
                         {formatCurrency(expense.amount)}
                       </span>
-                      {/* Buttons: always visible on mobile, fade-in on desktop hover */}
                       <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                        {canEdit && (
-                          <button
-                            onClick={() => setEditingExpense(expense)}
-                            className="p-1.5 rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
-                            title="Ausgabe bearbeiten"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button
-                            onClick={() => handleDelete(expense.id)}
-                            disabled={isDeleting}
-                            className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                            title="Ausgabe löschen"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => setEditingExpense(expense)}
+                          className="p-1.5 rounded-lg text-orange-400 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+                          title="Ausgabe bearbeiten"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(expense.id)}
+                          disabled={isDeleting}
+                          className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                          title="Ausgabe löschen"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
                   </li>
@@ -1160,7 +1384,7 @@ export default function ExpensesPage() {
         </CardContent>
       </Card>
 
-      {/* ── Ausgleich-Historie ── */}
+      {/* ── Ausgleich-Historie (sekundär, ganz unten) ── */}
       {settlementHistory.length > 0 && (
         <Card>
           <CardHeader>
@@ -1168,7 +1392,7 @@ export default function ExpensesPage() {
               <History className="h-5 w-5 text-indigo-500" />
               Ausgleich-Historie
             </CardTitle>
-            <CardDescription>Vergangene Schuldenausgleiche</CardDescription>
+            <CardDescription>Vergangene Schuldenausgleiche der WG</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             <ul className="divide-y divide-gray-100">
@@ -1228,9 +1452,19 @@ export default function ExpensesPage() {
         <EditDialog
           expense={editingExpense}
           members={members}
+          categories={categories}
           currentUserId={myId}
           onSave={handleEdit}
           onClose={() => setEditingExpense(null)}
+        />
+      )}
+
+      {showCategoryManager && (
+        <CategoryManager
+          categories={categories}
+          onCreated={(cat) => setCategories((prev) => [...prev, cat])}
+          onDeleted={(id) => setCategories((prev) => prev.filter((c) => c.id !== id))}
+          onClose={() => setShowCategoryManager(false)}
         />
       )}
     </div>
