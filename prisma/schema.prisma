@@ -184,19 +184,20 @@ model WGExpenseCategory {
 }
 
 model Expense {
-  id            String   @id @default(cuid())
-  wgId          String
-  amount        Float
-  description   String
-  category      String   @default("SONSTIGES")
-  paidBy        String
-  splitWith     String[]
-  splitMode     SplitMode       @default(EQUAL)
-  splits        Json?
-  date          DateTime        @default(now())
-  settledAt     DateTime?
-  createdAt     DateTime        @default(now())
-  gameSessionId String?
+  id              String    @id @default(cuid())
+  wgId            String
+  amount          Float
+  description     String
+  category        String    @default("SONSTIGES")
+  paidBy          String
+  splitWith       String[]
+  splitMode       SplitMode @default(EQUAL)
+  splits          Json?
+  date            DateTime  @default(now())
+  settledAt       DateTime?
+  createdAt       DateTime  @default(now())
+  gameSessionId   String?
+  receiptImageUrl String?
 
   wg          WGConfig     @relation(fields: [wgId], references: [id], onDelete: Cascade)
   paidByUser  User         @relation(fields: [paidBy], references: [id])

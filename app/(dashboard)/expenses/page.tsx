@@ -28,7 +28,9 @@ import {
   Settings,
   Tag,
   Zap,
+  ScanLine,
 } from 'lucide-react'
+import { ReceiptScanDialog } from './receipt-scan-dialog'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -72,6 +74,7 @@ interface Expense {
   settledAt: string | null
   createdAt: string
   paidByUser: SimpleUser
+  receiptImageUrl: string | null
 }
 
 interface NetSettlement {
@@ -796,6 +799,7 @@ export default function ExpensesPage() {
   }, [myId])
 
   const [showForm, setShowForm] = React.useState(false)
+  const [showReceiptScan, setShowReceiptScan] = React.useState(false)
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null)
   const [deletingId, setDeletingId] = React.useState<string | null>(null)
   const [settlingSettlement, setSettlingSettlement] = React.useState<NetSettlement | null>(null)
@@ -1061,6 +1065,10 @@ export default function ExpensesPage() {
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
             <span className="hidden sm:inline ml-1">Aktualisieren</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowReceiptScan(true)}>
+            <ScanLine className="h-4 w-4" />
+            <span className="hidden sm:inline ml-1">Scannen</span>
           </Button>
           <Button size="sm" onClick={() => setShowForm((v) => !v)}>
             <Plus className="h-4 w-4" />
@@ -1523,7 +1531,21 @@ export default function ExpensesPage() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
+                        {expense.receiptImageUrl && (
+                          <a
+                            href={expense.receiptImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Beleg anzeigen"
+                            className="shrink-0 text-indigo-400 hover:text-indigo-600 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Receipt className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 flex-wrap mt-0.5">
                         <span className="text-xs text-gray-400">{expense.paidByUser.name} bezahlt</span>
                         <Separator orientation="vertical" className="h-3" />
@@ -1666,6 +1688,15 @@ export default function ExpensesPage() {
           onClose={() => setShowCategoryManager(false)}
         />
       )}
+
+      <ReceiptScanDialog
+        open={showReceiptScan}
+        onOpenChange={setShowReceiptScan}
+        members={members}
+        currentUserId={myId}
+        categories={categories.length > 0 ? categories : FALLBACK_CATEGORIES}
+        onExpenseCreated={fetchData}
+      />
     </div>
   )
 }

@@ -12,6 +12,7 @@ const createExpenseSchema = z.object({
   splitMode: z.enum(['EQUAL', 'INDIVIDUAL', 'PERCENTAGE']).optional(),
   splits: z.record(z.string(), z.number()).optional(),
   date: z.string().datetime({ message: 'Invalid date format' }).optional(),
+  receiptImageUrl: z.string().url().optional(),
 })
 
 export async function GET() {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { amount, description, category, splitWith, splitMode, splits, date } = parsed.data
+    const { amount, description, category, splitWith, splitMode, splits, date, receiptImageUrl } = parsed.data
     const paidBy = parsed.data.paidBy ?? session.user.id
 
     // Ensure paidBy is in the WG
@@ -88,6 +89,7 @@ export async function POST(request: Request) {
         splitMode: resolvedMode,
         splits: splits !== undefined ? (splits as Prisma.InputJsonValue) : Prisma.DbNull,
         date: date ? new Date(date) : new Date(),
+        receiptImageUrl: receiptImageUrl ?? null,
       },
       include: { paidByUser: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     })
