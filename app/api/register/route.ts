@@ -2,6 +2,7 @@ import { z } from 'zod'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
+import { DEFAULT_EXPENSE_CATEGORIES } from '@/lib/expense-categories'
 
 const registerSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich'),
@@ -121,6 +122,15 @@ export async function POST(request: Request) {
         )
       )
       logger.info('Standard-Dienste erstellt', { userId: user.id, wgId })
+
+      await Promise.all(
+        DEFAULT_EXPENSE_CATEGORIES.map((cat) =>
+          prisma.wGExpenseCategory.create({
+            data: { wgId, name: cat.name, slug: cat.slug, color: cat.color, emoji: cat.emoji, isDefault: true, sortOrder: cat.sortOrder },
+          })
+        )
+      )
+      logger.info('Standard-Ausgabenkategorien erstellt', { userId: user.id, wgId })
     }
 
     return Response.json({ user }, { status: 201 })
