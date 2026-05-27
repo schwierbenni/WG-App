@@ -17,6 +17,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.99.0",
     "@auth/prisma-adapter": "^2.11.2",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.8.0",
@@ -49,7 +50,6 @@
     "react-hook-form": "^7.76.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0",
-    "tesseract.js": "^7.0.0",
     "uuid": "^14.0.0",
     "web-push": "^3.6.7",
     "zod": "^4.4.3"
