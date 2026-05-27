@@ -96,7 +96,8 @@ function ToastViewport({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id:
   return (
     <div
       aria-label="Benachrichtigungen"
-      className="fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:bottom-4 sm:right-4 sm:top-auto sm:max-w-[420px]"
+      className="fixed right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:right-4 sm:top-auto sm:max-w-[420px]"
+      style={{ bottom: 'var(--toast-bottom-offset)' }}
     >
       {toasts.map((t) => <ToastItem key={t.id} toast={t} onDismiss={onDismiss} />)}
     </div>
