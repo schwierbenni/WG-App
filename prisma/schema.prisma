@@ -154,23 +154,17 @@ model AnnouncementReaction {
 }
 
 model ShoppingItem {
-  id        String           @id @default(cuid())
+  id        String    @id @default(cuid())
   wgId      String
   name      String
-  category  ShoppingCategory @default(LEBENSMITTEL)
+  category  String    @default("LEBENSMITTEL")
   note      String?
   addedBy   String
   boughtAt  DateTime?
-  createdAt DateTime         @default(now())
+  createdAt DateTime  @default(now())
 
   wg   WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
   user User     @relation(fields: [addedBy], references: [id])
-}
-
-enum ShoppingCategory {
-  LEBENSMITTEL
-  HAUSHALT
-  SONSTIGES
 }
 
 model WGExpenseCategory {

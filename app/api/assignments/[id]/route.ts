@@ -107,8 +107,10 @@ export async function PATCH(
       })
       sendPushToUser(existing.userId, { title: 'Dienst erledigt ✓', body: doneMsg, url: '/duties' }).catch(() => {})
 
-      // Auto-rotate: assign next person in rotation order
+      // Auto-rotate: assign next person when completed on time (before deadline)
+      const completedOnTime = existing.dueDate >= new Date()
       const shouldRotate =
+        completedOnTime &&
         duty.isActive &&
         !duty.isPaused &&
         duty.rotationInterval !== 'MANUAL' &&
@@ -128,7 +130,8 @@ export async function PATCH(
 
           const nextUser = await prisma.user.findUnique({ where: { id: nextUserId, wgId } })
           if (nextUser) {
-            const dueDate = getNextDueDate(duty.rotationInterval)
+            // Base next due date on the original deadline to keep the rotation on schedule
+            const dueDate = getNextDueDate(duty.rotationInterval, existing.dueDate)
             await prisma.dutyAssignment.create({
               data: { wgId, dutyId: duty.id, userId: nextUserId, dueDate },
             })

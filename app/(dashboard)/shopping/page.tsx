@@ -13,7 +13,14 @@ import { Separator } from '@/components/ui/separator'
 import { cn, formatDate, getInitials } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
-type ShoppingCategory = 'LEBENSMITTEL' | 'HAUSHALT' | 'SONSTIGES'
+interface ExpenseCategory {
+  id: string
+  slug: string
+  name: string
+  color: string
+  emoji: string | null
+  sortOrder: number
+}
 
 interface SimpleUser {
   id: string
@@ -24,40 +31,52 @@ interface SimpleUser {
 interface ShoppingItem {
   id: string
   name: string
-  category: ShoppingCategory
+  category: string
   note: string | null
   boughtAt: string | null
   createdAt: string
   user: SimpleUser
 }
 
-const CATEGORY_LABELS: Record<ShoppingCategory, string> = {
-  LEBENSMITTEL: 'Lebensmittel',
-  HAUSHALT: 'Haushalt',
-  SONSTIGES: 'Sonstiges',
-}
+const FALLBACK_CATEGORIES: ExpenseCategory[] = [
+  { id: 'f1', slug: 'LEBENSMITTEL', name: 'Lebensmittel', color: '#16a34a', emoji: '🛒', sortOrder: 1 },
+  { id: 'f2', slug: 'HAUSHALT',     name: 'Haushalt',     color: '#2563eb', emoji: '🏠', sortOrder: 2 },
+  { id: 'f3', slug: 'SONSTIGES',    name: 'Sonstiges',    color: '#6b7280', emoji: '📝', sortOrder: 3 },
+]
 
-const CATEGORY_COLORS: Record<ShoppingCategory, string> = {
-  LEBENSMITTEL: 'bg-green-100 text-green-700',
-  HAUSHALT: 'bg-blue-100 text-blue-700',
-  SONSTIGES: 'bg-gray-100 text-gray-600',
+function hexToTailwindStyle(color: string): React.CSSProperties {
+  return { backgroundColor: color + '20', color }
 }
-
-const CATEGORY_ORDER: ShoppingCategory[] = ['LEBENSMITTEL', 'HAUSHALT', 'SONSTIGES']
 
 export default function ShoppingPage() {
   const { data: session } = useSession()
   const [items, setItems] = React.useState<ShoppingItem[]>([])
+  const [categories, setCategories] = React.useState<ExpenseCategory[]>(FALLBACK_CATEGORIES)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
 
   const [name, setName] = React.useState('')
-  const [category, setCategory] = React.useState<ShoppingCategory>('LEBENSMITTEL')
+  const [category, setCategory] = React.useState('')
   const [note, setNote] = React.useState('')
   const [submitting, setSubmitting] = React.useState(false)
   const [submitError, setSubmitError] = React.useState('')
 
   const [actionLoading, setActionLoading] = React.useState<string | null>(null)
+
+  const fetchCategories = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/expenses/categories')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.categories?.length) {
+          setCategories(data.categories)
+          setCategory((prev) => prev || data.categories[0].slug)
+        }
+      }
+    } catch {
+      // keep fallback categories
+    }
+  }, [])
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
@@ -75,8 +94,16 @@ export default function ShoppingPage() {
   }, [])
 
   React.useEffect(() => {
+    fetchCategories()
     fetchData()
-  }, [fetchData])
+  }, [fetchCategories, fetchData])
+
+  // Set default category once categories load
+  React.useEffect(() => {
+    if (categories.length > 0 && !category) {
+      setCategory(categories[0].slug)
+    }
+  }, [categories, category])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -87,7 +114,7 @@ export default function ShoppingPage() {
       const res = await fetch('/api/shopping', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), category, note: note.trim() || undefined }),
+        body: JSON.stringify({ name: name.trim(), category: category || categories[0]?.slug, note: note.trim() || undefined }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -137,13 +164,20 @@ export default function ShoppingPage() {
     }
   }
 
+  const getCategoryBySlug = React.useCallback(
+    (slug: string) => categories.find((c) => c.slug === slug) ?? null,
+    [categories]
+  )
+
   const unboughtByCategory = React.useMemo(() => {
     const unbought = items.filter((i) => !i.boughtAt)
-    return CATEGORY_ORDER.map((cat) => ({
-      category: cat,
-      items: unbought.filter((i) => i.category === cat),
-    })).filter((g) => g.items.length > 0)
-  }, [items])
+    return categories
+      .map((cat) => ({
+        category: cat,
+        items: unbought.filter((i) => i.category === cat.slug),
+      }))
+      .filter((g) => g.items.length > 0)
+  }, [items, categories])
 
   const boughtItems = React.useMemo(() => items.filter((i) => i.boughtAt), [items])
   const unboughtCount = items.filter((i) => !i.boughtAt).length
@@ -172,7 +206,6 @@ export default function ShoppingPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAdd} className="space-y-3">
-            {/* Stacked on mobile, side-by-side on sm+ */}
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="flex-1">
                 <Label htmlFor="item-name" className="sr-only">Artikelname</Label>
@@ -185,18 +218,18 @@ export default function ShoppingPage() {
                   autoComplete="off"
                 />
               </div>
-              <div className="sm:w-40">
+              <div className="sm:w-48">
                 <Label htmlFor="item-category" className="sr-only">Kategorie</Label>
                 <select
                   id="item-category"
                   value={category}
-                  onChange={(e) => setCategory(e.target.value as ShoppingCategory)}
+                  onChange={(e) => setCategory(e.target.value)}
                   className="h-11 w-full rounded-xl border-2 border-surface-border bg-white px-3 py-2 text-base focus:outline-none focus:border-brand-600"
                   disabled={submitting}
                 >
-                  {CATEGORY_ORDER.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
+                  {categories.map((cat) => (
+                    <option key={cat.slug} value={cat.slug}>
+                      {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
                     </option>
                   ))}
                 </select>
@@ -251,10 +284,16 @@ export default function ShoppingPage() {
       ) : (
         <div className="space-y-4">
           {unboughtByCategory.map(({ category: cat, items: catItems }) => (
-            <Card key={cat}>
+            <Card key={cat.slug}>
               <CardHeader className="py-3 px-4">
                 <div className="flex items-center gap-2">
-                  <Badge className={`${CATEGORY_COLORS[cat]} text-sm px-3 py-0.5`}>{CATEGORY_LABELS[cat]}</Badge>
+                  <Badge
+                    className="text-sm px-3 py-0.5 font-medium border-0"
+                    style={hexToTailwindStyle(cat.color)}
+                  >
+                    {cat.emoji && <span className="mr-1">{cat.emoji}</span>}
+                    {cat.name}
+                  </Badge>
                   <span className="text-sm text-gray-400">{catItems.length}</span>
                 </div>
               </CardHeader>
@@ -264,6 +303,7 @@ export default function ShoppingPage() {
                     <ShoppingItemRow
                       key={item.id}
                       item={item}
+                      category={getCategoryBySlug(item.category)}
                       actionLoading={actionLoading}
                       onToggleBought={handleToggleBought}
                       onDelete={handleDelete}
@@ -291,6 +331,7 @@ export default function ShoppingPage() {
                     <ShoppingItemRow
                       key={item.id}
                       item={item}
+                      category={getCategoryBySlug(item.category)}
                       actionLoading={actionLoading}
                       onToggleBought={handleToggleBought}
                       onDelete={handleDelete}
@@ -309,6 +350,7 @@ export default function ShoppingPage() {
 
 interface ShoppingItemRowProps {
   item: ShoppingItem
+  category: ExpenseCategory | null
   actionLoading: string | null
   onToggleBought: (item: ShoppingItem) => void
   onDelete: (id: string) => void
@@ -317,6 +359,7 @@ interface ShoppingItemRowProps {
 
 function ShoppingItemRow({
   item,
+  category,
   actionLoading,
   onToggleBought,
   onDelete,
@@ -365,6 +408,17 @@ function ShoppingItemRow({
             <AvatarFallback className="text-[8px]">{getInitials(item.user.name)}</AvatarFallback>
           </Avatar>
           <span className="text-xs text-gray-400">{item.user.name}</span>
+          {category && !isBought && (
+            <>
+              <Separator orientation="vertical" className="h-3" />
+              <span
+                className="text-xs px-1.5 py-0.5 rounded font-medium"
+                style={hexToTailwindStyle(category.color)}
+              >
+                {category.emoji && `${category.emoji} `}{category.name}
+              </span>
+            </>
+          )}
           {isBought && item.boughtAt && (
             <>
               <Separator orientation="vertical" className="h-3" />
