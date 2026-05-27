@@ -92,10 +92,12 @@ interface SettlementRecord {
 }
 
 const FALLBACK_CATEGORIES: WGExpenseCategory[] = [
-  { id: 'fb-1', name: 'Lebensmittel', slug: 'LEBENSMITTEL', color: '#16a34a', emoji: '🛒', isDefault: true, sortOrder: 1 },
-  { id: 'fb-2', name: 'Haushalt', slug: 'HAUSHALT', color: '#2563eb', emoji: '🏠', isDefault: true, sortOrder: 2 },
-  { id: 'fb-3', name: 'Miete & NK', slug: 'MIETE_NEBENKOSTEN', color: '#9333ea', emoji: '🏡', isDefault: true, sortOrder: 3 },
-  { id: 'fb-4', name: 'Sonstiges', slug: 'SONSTIGES', color: '#6b7280', emoji: '📝', isDefault: true, sortOrder: 4 },
+  { id: 'fb-1', name: 'Lebensmittel', slug: 'LEBENSMITTEL',     color: '#16a34a', emoji: '🛒', isDefault: true, sortOrder: 1 },
+  { id: 'fb-2', name: 'Haushalt',     slug: 'HAUSHALT',          color: '#2563eb', emoji: '🏠', isDefault: true, sortOrder: 2 },
+  { id: 'fb-3', name: 'Miete & NK',   slug: 'MIETE_NEBENKOSTEN', color: '#9333ea', emoji: '🏡', isDefault: true, sortOrder: 3 },
+  { id: 'fb-4', name: 'Sonstiges',    slug: 'SONSTIGES',         color: '#6b7280', emoji: '📝', isDefault: true, sortOrder: 4 },
+  { id: 'fb-5', name: 'Skat',         slug: 'SKAT',              color: '#d97706', emoji: '🃏', isDefault: true, sortOrder: 5 },
+  { id: 'fb-6', name: 'Doppelkopf',   slug: 'DOPPELKOPF',        color: '#ea580c', emoji: '🀄', isDefault: true, sortOrder: 6 },
 ]
 
 const SPLIT_MODES: SplitMode[] = ['EQUAL', 'INDIVIDUAL', 'PERCENTAGE']
