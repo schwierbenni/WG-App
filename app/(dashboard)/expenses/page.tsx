@@ -91,6 +91,13 @@ interface SettlementRecord {
   toUser: SimpleUser
 }
 
+const FALLBACK_CATEGORIES: WGExpenseCategory[] = [
+  { id: 'fb-1', name: 'Lebensmittel', slug: 'LEBENSMITTEL', color: '#16a34a', emoji: '🛒', isDefault: true, sortOrder: 1 },
+  { id: 'fb-2', name: 'Haushalt', slug: 'HAUSHALT', color: '#2563eb', emoji: '🏠', isDefault: true, sortOrder: 2 },
+  { id: 'fb-3', name: 'Miete & NK', slug: 'MIETE_NEBENKOSTEN', color: '#9333ea', emoji: '🏡', isDefault: true, sortOrder: 3 },
+  { id: 'fb-4', name: 'Sonstiges', slug: 'SONSTIGES', color: '#6b7280', emoji: '📝', isDefault: true, sortOrder: 4 },
+]
+
 const SPLIT_MODES: SplitMode[] = ['EQUAL', 'INDIVIDUAL', 'PERCENTAGE']
 const SPLIT_MODE_LABELS: Record<SplitMode, string> = {
   EQUAL: 'Gleich',
@@ -312,7 +319,8 @@ interface ExpenseFormProps {
   submitLabel?: string
 }
 
-function ExpenseForm({ members, categories, currentUserId, initialData, onSubmit, onCancel, submitLabel = 'Speichern' }: ExpenseFormProps) {
+function ExpenseForm({ members, categories: rawCategories, currentUserId, initialData, onSubmit, onCancel, submitLabel = 'Speichern' }: ExpenseFormProps) {
+  const categories = rawCategories.length > 0 ? rawCategories : FALLBACK_CATEGORIES
   const defaultCategory = categories.find((c) => c.slug === 'SONSTIGES')?.slug ?? categories[0]?.slug ?? 'SONSTIGES'
   const [amount, setAmount] = React.useState(initialData?.amount ?? '')
   const [description, setDescription] = React.useState(initialData?.description ?? '')
@@ -1058,44 +1066,49 @@ export default function ExpensesPage() {
                     <div key={key} className={cn('rounded-lg border overflow-hidden', isMyDebt ? 'border-red-200' : isOwedToMe ? 'border-green-200' : 'border-gray-200')}>
                       {/* Settlement header row - mobile optimized */}
                       <div className={cn('p-3', isMyDebt ? 'bg-red-50' : isOwedToMe ? 'bg-green-50' : 'bg-white')}>
-                        {/* Top row: names + amount */}
-                        <div className="flex items-center gap-2 min-w-0">
+                        {/* Names row: grid gives equal space to both sides */}
+                        <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => toggleSettlementExpand(key)}
-                            className="shrink-0 p-0.5"
+                            className="shrink-0 p-1"
                           >
                             {isExpanded
                               ? <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
                               : <ChevronDown className="h-3.5 w-3.5 text-gray-400" />}
                           </button>
-                          {/* From */}
-                          <Avatar className="h-6 w-6 shrink-0">
-                            {memberMap.get(s.fromUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.fromUserId)!.avatarUrl!} alt={s.fromUserName} />}
-                            <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.fromUserName)}</AvatarFallback>
-                          </Avatar>
-                          <span className={cn('text-sm font-medium min-w-0 truncate max-w-[5rem] sm:max-w-none', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
-                            {isMyDebt ? 'Du' : s.fromUserName}
-                          </span>
-                          <ArrowRight className="h-3 w-3 text-gray-400 shrink-0" />
-                          {/* To */}
-                          <Avatar className="h-6 w-6 shrink-0">
-                            {memberMap.get(s.toUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.toUserId)!.avatarUrl!} alt={s.toUserName} />}
-                            <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.toUserName)}</AvatarFallback>
-                          </Avatar>
-                          <span className={cn('text-sm font-medium min-w-0 truncate max-w-[5rem] sm:max-w-none flex-1', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
-                            {isOwedToMe ? 'Dir' : s.toUserName}
-                          </span>
-                          <span className={cn('font-semibold text-sm shrink-0', isMyDebt ? 'text-red-600' : isOwedToMe ? 'text-green-600' : 'text-gray-700')}>
+                          {/* Equal-width grid for from/arrow/to */}
+                          <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 min-w-0">
+                            <div className="flex items-center gap-1 min-w-0">
+                              <Avatar className="h-5 w-5 shrink-0">
+                                {memberMap.get(s.fromUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.fromUserId)!.avatarUrl!} alt={s.fromUserName} />}
+                                <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.fromUserName)}</AvatarFallback>
+                              </Avatar>
+                              <span className={cn('text-sm font-medium truncate', isMyDebt ? 'text-red-700' : 'text-gray-700')}>
+                                {isMyDebt ? 'Du' : s.fromUserName}
+                              </span>
+                            </div>
+                            <ArrowRight className="h-3 w-3 text-gray-400 shrink-0" />
+                            <div className="flex items-center gap-1 min-w-0">
+                              <Avatar className="h-5 w-5 shrink-0">
+                                {memberMap.get(s.toUserId)?.avatarUrl && <AvatarImage src={memberMap.get(s.toUserId)!.avatarUrl!} alt={s.toUserName} />}
+                                <AvatarFallback className="text-[8px] bg-indigo-100 text-indigo-700">{getInitials(s.toUserName)}</AvatarFallback>
+                              </Avatar>
+                              <span className={cn('text-sm font-medium truncate', isOwedToMe ? 'text-green-700' : 'text-gray-700')}>
+                                {isOwedToMe ? 'Dir' : s.toUserName}
+                              </span>
+                            </div>
+                          </div>
+                          <span className={cn('font-semibold text-sm shrink-0 ml-1', isMyDebt ? 'text-red-600' : isOwedToMe ? 'text-green-600' : 'text-gray-700')}>
                             {formatCurrency(s.amount)}
                           </span>
                         </div>
-                        {/* Bottom row: settle button (full width on mobile) */}
+                        {/* Settle button: full width on mobile */}
                         {(isMyDebt || isOwedToMe) && (
                           <div className="mt-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-xs w-full sm:w-auto"
+                              className="h-8 text-xs w-full sm:w-auto"
                               onClick={() => setSettlingSettlement(s)}
                             >
                               <Check className="h-3 w-3 mr-1" />

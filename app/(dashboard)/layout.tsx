@@ -47,7 +47,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
 
         {/* Main content — extra bottom padding on mobile for the bottom nav */}
-        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-24 lg:pb-6">
+        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6"
+          style={{ paddingBottom: 'max(4.5rem, calc(4rem + env(safe-area-inset-bottom, 0px)))' }}>
           {children}
         </main>
       </div>
