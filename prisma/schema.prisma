@@ -120,7 +120,7 @@ model SwapRequest {
   wg         WGConfig       @relation(fields: [wgId], references: [id], onDelete: Cascade)
   fromUser   User           @relation("SwapFrom", fields: [fromUserId], references: [id])
   toUser     User           @relation("SwapTo", fields: [toUserId], references: [id])
-  assignment DutyAssignment @relation(fields: [assignmentId], references: [id])
+  assignment DutyAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 }
 
 enum SwapStatus {
