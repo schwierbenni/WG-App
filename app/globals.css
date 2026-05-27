@@ -106,8 +106,17 @@
 }
 
 /* ─── Base styles ────────────────────────────────────────────────────────── */
+
+/* html and body match the app's main background so iOS elastic-scroll
+   overscroll and any uncovered viewport edges show no mismatched color band. */
+html {
+  scroll-behavior: smooth;
+  height: 100%;
+  background: var(--surface-muted);
+}
+
 body {
-  background: var(--background);
+  background: var(--surface-muted);
   color: var(--foreground);
   font-family: var(--font-dmsans, system-ui, sans-serif);
   -webkit-tap-highlight-color: transparent;
@@ -115,12 +124,6 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-syne, system-ui, sans-serif);
-}
-
-html {
-  scroll-behavior: smooth;
-  height: 100%;
-  padding-top: env(safe-area-inset-top);
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */

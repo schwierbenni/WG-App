@@ -27,6 +27,7 @@ import {
   ChevronUp,
   Settings,
   Tag,
+  Zap,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -37,6 +38,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { cn, formatDate, formatCurrency, getInitials } from '@/lib/utils'
+import { useToast } from '@/components/ui/toast'
 
 type SplitMode = 'EQUAL' | 'INDIVIDUAL' | 'PERCENTAGE'
 
@@ -117,6 +119,45 @@ function getCategoryBadgeStyle(color: string): React.CSSProperties {
     color: color,
     borderColor: `${color}50`,
   }
+}
+
+function computeRawDebts(
+  expenses: Expense[],
+  memberMap: Map<string, SimpleUser>
+): NetSettlement[] {
+  // For each pair of users, net their direct balance (no transaction minimisation)
+  const pairBalance = new Map<string, number>()
+
+  for (const e of expenses) {
+    if (e.settledAt !== null) continue
+    for (const uid of e.splitWith) {
+      if (uid === e.paidBy) continue
+      const share =
+        e.splitMode === 'INDIVIDUAL'
+          ? (e.splits?.[uid] ?? 0)
+          : e.splitMode === 'PERCENTAGE'
+          ? e.amount * ((e.splits?.[uid] ?? 0) / 100)
+          : e.amount / e.splitWith.length
+      if (share <= 0) continue
+      // Canonical key: smaller-id first; positive = second owes first
+      const [a, b] = e.paidBy < uid ? [e.paidBy, uid] : [uid, e.paidBy]
+      const sign = e.paidBy === a ? 1 : -1
+      pairBalance.set(`${a}:${b}`, (pairBalance.get(`${a}:${b}`) ?? 0) + sign * share)
+    }
+  }
+
+  const result: NetSettlement[] = []
+  for (const [key, net] of pairBalance) {
+    const rounded = Math.round(Math.abs(net) * 100) / 100
+    if (rounded < 0.01) continue
+    const [a, b] = key.split(':')
+    const [fromId, toId] = net > 0 ? [b, a] : [a, b]
+    const fromUser = memberMap.get(fromId)
+    const toUser = memberMap.get(toId)
+    if (!fromUser || !toUser) continue
+    result.push({ fromUserId: fromId, fromUserName: fromUser.name, toUserId: toId, toUserName: toUser.name, amount: rounded })
+  }
+  return result
 }
 
 function buildSplitsPayload(
@@ -735,6 +776,7 @@ function EditDialog({
 export default function ExpensesPage() {
   const { data: session } = useSession()
   const myId = session?.user?.id ?? ''
+  const { toast } = useToast()
 
   const [expenses, setExpenses] = React.useState<Expense[]>([])
   const [settlements, setSettlements] = React.useState<NetSettlement[]>([])
@@ -743,6 +785,15 @@ export default function ExpensesPage() {
   const [categories, setCategories] = React.useState<WGExpenseCategory[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
+
+  const [simplifyDebts, setSimplifyDebts] = React.useState(false)
+
+  // Load persisted toggle preference from localStorage (per user, not per WG)
+  React.useEffect(() => {
+    if (!myId) return
+    const stored = localStorage.getItem(`simplifyDebts:${myId}`)
+    if (stored !== null) setSimplifyDebts(stored === 'true')
+  }, [myId])
 
   const [showForm, setShowForm] = React.useState(false)
   const [editingExpense, setEditingExpense] = React.useState<Expense | null>(null)
@@ -921,11 +972,36 @@ export default function ExpensesPage() {
   const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0)
   const myPaidExpenses = expenses.filter((e) => e.paidBy === myId)
   const myPaidTotal = myPaidExpenses.reduce((sum, e) => sum + e.amount, 0)
-  const iOwe = settlements.filter((s) => s.fromUserId === myId).reduce((s, x) => s + x.amount, 0)
-  const owedToMe = settlements.filter((s) => s.toUserId === myId).reduce((s, x) => s + x.amount, 0)
 
-  const myDebts = settlements.filter((s) => s.fromUserId === myId)
-  const othersDebts = settlements.filter((s) => s.toUserId === myId)
+  const memberMap = React.useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members]
+  )
+
+  const displayedSettlements = React.useMemo(
+    () => simplifyDebts ? settlements : computeRawDebts(expenses, memberMap),
+    [simplifyDebts, settlements, expenses, memberMap]
+  )
+
+  const handleToggleSimplify = () => {
+    const next = !simplifyDebts
+    setSimplifyDebts(next)
+    if (myId) localStorage.setItem(`simplifyDebts:${myId}`, String(next))
+    toast({
+      variant: 'info',
+      title: next ? 'Schuldenvereinfachung aktiviert' : 'Schuldenvereinfachung deaktiviert',
+      description: next
+        ? 'Zahlungswege werden mathematisch optimiert.'
+        : 'Es werden 1:1-Schulden aus echten Ausgaben angezeigt.',
+      duration: 3000,
+    })
+  }
+
+  const iOwe = displayedSettlements.filter((s) => s.fromUserId === myId).reduce((s, x) => s + x.amount, 0)
+  const owedToMe = displayedSettlements.filter((s) => s.toUserId === myId).reduce((s, x) => s + x.amount, 0)
+
+  const myDebts = displayedSettlements.filter((s) => s.fromUserId === myId)
+  const othersDebts = displayedSettlements.filter((s) => s.toUserId === myId)
   const myBalance = owedToMe - iOwe
 
   const allDebtLines = React.useMemo(() => {
@@ -938,7 +1014,7 @@ export default function ExpensesPage() {
   const handleSettleAll = async () => {
     setSettlingAll(true)
     setShowSettleAll(false)
-    const mySettlements = settlements.filter((s) => s.fromUserId === myId || s.toUserId === myId)
+    const mySettlements = displayedSettlements.filter((s) => s.fromUserId === myId || s.toUserId === myId)
     for (const s of mySettlements) {
       try {
         await fetch('/api/expenses/settlements', {
@@ -951,11 +1027,6 @@ export default function ExpensesPage() {
     setSettlingAll(false)
     fetchData()
   }
-
-  const memberMap = React.useMemo(
-    () => new Map(members.map((m) => [m.id, m])),
-    [members]
-  )
 
   const getExpenseSplitDetail = (expense: Expense): string => {
     if (expense.splitMode === 'EQUAL') {
@@ -1122,22 +1193,55 @@ export default function ExpensesPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Wallet className="h-5 w-5 text-indigo-500" />
-              Schuldenausgleich
-            </CardTitle>
-            <CardDescription>Minimale Transaktionen</CardDescription>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Wallet className="h-5 w-5 text-indigo-500" />
+                  Schuldenausgleich
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  {simplifyDebts ? 'Optimierte Zahlungswege' : '1:1 aus echten Ausgaben'}
+                </CardDescription>
+              </div>
+              {/* Debt simplification toggle */}
+              <button
+                onClick={handleToggleSimplify}
+                title={simplifyDebts ? 'Schuldenvereinfachung deaktivieren' : 'Schulden vereinfachen'}
+                className={cn(
+                  'flex items-center gap-2 rounded-xl border-2 px-3 py-1.5 text-xs font-medium transition-all shrink-0',
+                  simplifyDebts
+                    ? 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                    : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+                )}
+              >
+                <Zap className={cn('h-3.5 w-3.5', simplifyDebts ? 'text-indigo-500' : 'text-gray-400')} />
+                <span className="hidden sm:inline">Vereinfachen</span>
+                <span
+                  className={cn(
+                    'relative inline-flex h-4 w-7 items-center rounded-full transition-colors',
+                    simplifyDebts ? 'bg-indigo-500' : 'bg-gray-200'
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform',
+                      simplifyDebts ? 'translate-x-3.5' : 'translate-x-0.5'
+                    )}
+                  />
+                </span>
+              </button>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="space-y-3">
                 {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)}
               </div>
-            ) : settlements.length === 0 ? (
+            ) : displayedSettlements.length === 0 ? (
               <p className="text-sm text-gray-400 py-4 text-center">Keine offenen Schulden 🎉</p>
             ) : (
               <div className="space-y-2">
-                {settlements.map((s) => {
+                {displayedSettlements.map((s) => {
                   const key = `${s.fromUserId}-${s.toUserId}`
                   const isMyDebt = s.fromUserId === myId
                   const isOwedToMe = s.toUserId === myId
