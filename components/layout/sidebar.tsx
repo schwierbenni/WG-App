@@ -324,12 +324,13 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
         </div>
       </div>
 
-      {/* Bottom nav bar */}
+      {/* Bottom nav bar — h-16 exactly, no safe-area spacer.
+          The iOS home indicator renders as a system overlay on top. */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-surface"
+        className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-surface h-16"
         style={{ boxShadow: '0 -1px 0 0 var(--surface-border)' }}
       >
-        <div className="flex items-stretch h-16">
+        <div className="flex items-stretch h-full">
           {bottomPrimary.map((item) => {
             const active = item.href === '/dashboard'
               ? pathname === '/dashboard'
@@ -366,10 +367,6 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
             </span>
           </button>
         </div>
-        {/* Safe-area spacer: only active in standalone PWA mode.
-            In Safari browser, env(safe-area-inset-bottom) includes the
-            browser toolbar (~83px) which would create a huge white gap. */}
-        <div aria-hidden="true" className="nav-safe-bottom" />
       </nav>
     </>
   )
