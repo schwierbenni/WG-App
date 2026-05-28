@@ -67,11 +67,39 @@ export function ReceiptScanDialog({ open, onOpenChange, members, currentUserId, 
 
   function handleFile(file: File) { setImageFile(file); setImagePreview(URL.createObjectURL(file)); setError(null) }
 
+  function normalizeToJpeg(file: File): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        const MAX = 1920
+        let { naturalWidth: w, naturalHeight: h } = img
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round((h * MAX) / w); w = MAX }
+          else { w = Math.round((w * MAX) / h); h = MAX }
+        }
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) { reject(new Error('Canvas nicht verfügbar')); return }
+        ctx.drawImage(img, 0, 0, w, h)
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error('Bildkonvertierung fehlgeschlagen')),
+          'image/jpeg', 0.92
+        )
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Bild konnte nicht geladen werden')) }
+      img.src = url
+    })
+  }
+
   async function runOcr() {
     if (!imageFile) return
     setStage('processing'); setError(null)
     try {
-      const fd = new FormData(); fd.append('image', imageFile)
+      const jpeg = await normalizeToJpeg(imageFile)
+      const fd = new FormData(); fd.append('image', jpeg, 'receipt.jpg')
       const res = await fetch('/api/receipts/scan', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'OCR fehlgeschlagen')
