@@ -107,16 +107,18 @@
 
 /* ─── Base styles ────────────────────────────────────────────────────────── */
 
-/* html and body match the app's main background so iOS elastic-scroll
-   overscroll and any uncovered viewport edges show no mismatched color band. */
+/* html and body use --surface (white) so the iOS elastic-scroll overscroll
+   and the bottom safe-area (home-indicator zone) match the tab bar, not the
+   content area. The beige surface-muted is provided by the fixed inset-0 root
+   div in layout.tsx, which never leaks into overscroll/safe-area zones. */
 html {
   scroll-behavior: smooth;
   height: 100%;
-  background: var(--surface-muted);
+  background: var(--surface);
 }
 
 body {
-  background: var(--surface-muted);
+  background: var(--surface);
   color: var(--foreground);
   font-family: var(--font-dmsans, system-ui, sans-serif);
   -webkit-tap-highlight-color: transparent;
