@@ -246,114 +246,133 @@ function CategoryManager({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl my-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Tag className="h-4 w-4 text-indigo-500" />
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md max-h-[88dvh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-surface shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
+          <div className="h-1 w-10 rounded-full bg-surface-border" />
+        </div>
+
+        {/* Sticky header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-surface-border shrink-0">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <Tag className="h-4 w-4 text-brand-600" />
             Kategorien verwalten
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="h-4 w-4" />
+          <button
+            onClick={onClose}
+            className="p-2 -mr-1 rounded-xl text-[var(--text-muted)] hover:bg-surface-muted active:scale-90 transition-all"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Existing categories */}
-        <div className="space-y-1.5 mb-4 max-h-48 overflow-y-auto">
-          {categories.map((cat) => (
-            <div key={cat.id} className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 bg-gray-50">
-              <span className="text-base w-6 text-center">{cat.emoji ?? '🏷️'}</span>
-              <span
-                className="flex-1 text-sm font-medium rounded-full px-2 py-0.5 border"
-                style={getCategoryBadgeStyle(cat.color)}
-              >
-                {cat.name}
-              </span>
-              {cat.isDefault ? (
-                <span className="text-[10px] text-gray-400">Standard</span>
-              ) : (
-                <button
-                  onClick={() => handleDelete(cat.id)}
-                  disabled={deletingId === cat.id}
-                  className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-
-        <Separator className="mb-4" />
-
-        {/* Create new */}
-        <form onSubmit={handleCreate} className="space-y-3">
-          <p className="text-xs font-medium text-gray-600">Neue Kategorie hinzufügen</p>
-
-          {/* Name + Color */}
-          <div className="flex gap-2 items-end">
-            <div className="flex-1 space-y-1">
-              <Label htmlFor="cat-name" className="text-xs">Name</Label>
-              <Input
-                id="cat-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="z.B. Freizeit"
-                disabled={submitting}
-                className="h-9"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Farbe</Label>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                disabled={submitting}
-                className="h-9 w-9 cursor-pointer rounded border border-gray-200 p-0.5"
-              />
-            </div>
-          </div>
-
-          {/* Emoji picker */}
+        {/* Scrollable content */}
+        <div className="overflow-y-auto overscroll-contain flex-1 px-5 py-4 space-y-4">
+          {/* Existing categories */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Emoji {emoji && <span className="ml-1 text-base">{emoji}</span>}</Label>
-            <div className="flex flex-wrap gap-1.5 p-2 rounded-lg border border-gray-200 bg-gray-50">
-              {PRESET_EMOJIS.map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => setEmoji(emoji === e ? '' : e)}
-                  disabled={submitting}
-                  className={cn(
-                    'text-lg w-9 h-9 rounded-lg border flex items-center justify-center transition-all active:scale-90',
-                    emoji === e
-                      ? 'border-indigo-400 bg-indigo-50 ring-1 ring-indigo-400'
-                      : 'border-gray-200 bg-white hover:bg-gray-100'
-                  )}
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-2 rounded-xl border border-surface-border px-3 py-2.5 bg-surface-muted">
+                <span className="text-base w-6 text-center">{cat.emoji ?? '🏷️'}</span>
+                <span
+                  className="flex-1 text-sm font-medium rounded-full px-2 py-0.5 border"
+                  style={getCategoryBadgeStyle(cat.color)}
                 >
-                  {e}
-                </button>
-              ))}
-            </div>
+                  {cat.name}
+                </span>
+                {cat.isDefault ? (
+                  <span className="text-[10px] text-[var(--text-subtle)]">Standard</span>
+                ) : (
+                  <button
+                    onClick={() => handleDelete(cat.id)}
+                    disabled={deletingId === cat.id}
+                    className="p-1.5 rounded-lg text-[var(--danger)] hover:bg-[var(--danger-bg)] transition-colors disabled:opacity-50"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
           </div>
 
-          {/* Preview */}
-          {name && (
-            <div className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 bg-gray-50">
-              <span className="text-base w-6 text-center">{emoji || '🏷️'}</span>
-              <span className="text-sm font-medium rounded-full px-2 py-0.5 border" style={getCategoryBadgeStyle(color)}>
-                {name}
-              </span>
-            </div>
-          )}
+          <Separator />
 
-          {error && <p className="text-xs text-red-600">{error}</p>}
-          <Button type="submit" disabled={submitting || !name.trim()} className="w-full" size="sm">
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            {submitting ? 'Wird erstellt...' : 'Kategorie erstellen'}
-          </Button>
-        </form>
+          {/* Create new */}
+          <form onSubmit={handleCreate} className="space-y-3">
+            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide">Neue Kategorie</p>
+
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1">
+                <Label htmlFor="cat-name" className="text-xs">Name</Label>
+                <Input
+                  id="cat-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="z.B. Freizeit"
+                  disabled={submitting}
+                  className="h-11"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Farbe</Label>
+                <input
+                  type="color"
+                  value={color}
+                  onChange={(e) => setColor(e.target.value)}
+                  disabled={submitting}
+                  className="h-11 w-11 cursor-pointer rounded-xl border-2 border-surface-border p-0.5"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Emoji {emoji && <span className="ml-1 text-base">{emoji}</span>}</Label>
+              <div className="flex flex-wrap gap-1.5 p-2 rounded-xl border border-surface-border bg-surface-muted">
+                {PRESET_EMOJIS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => setEmoji(emoji === e ? '' : e)}
+                    disabled={submitting}
+                    className={cn(
+                      'text-lg w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all active:scale-90',
+                      emoji === e
+                        ? 'border-brand-600 bg-brand-muted ring-1 ring-brand-600'
+                        : 'border-surface-border bg-surface hover:bg-surface-muted'
+                    )}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {name && (
+              <div className="flex items-center gap-2 rounded-xl border border-surface-border px-3 py-2.5 bg-surface-muted">
+                <span className="text-base w-6 text-center">{emoji || '🏷️'}</span>
+                <span className="text-sm font-medium rounded-full px-2 py-0.5 border" style={getCategoryBadgeStyle(color)}>
+                  {name}
+                </span>
+              </div>
+            )}
+
+            {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
+
+            <Button type="submit" disabled={submitting || !name.trim()} className="w-full min-h-[44px]">
+              <Plus className="h-4 w-4 mr-1" />
+              {submitting ? 'Wird erstellt...' : 'Kategorie erstellen'}
+            </Button>
+          </form>
+
+          {/* Bottom safe area spacer */}
+          <div className="h-[env(safe-area-inset-bottom,0px)]" />
+        </div>
       </div>
     </div>
   )
@@ -739,36 +758,55 @@ function SettleDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900">Schulden ausgleichen</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="h-4 w-4" />
-          </button>
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl bg-surface shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden">
+          <div className="h-1 w-10 rounded-full bg-surface-border" />
         </div>
-        <div className="rounded-lg bg-indigo-50 border border-indigo-100 p-3 mb-4 text-sm text-indigo-800">
-          <strong>{settlement.fromUserName}</strong> zahlt <strong>{settlement.toUserName}</strong>
-          {' '}<strong className="text-indigo-600">{formatCurrency(settlement.amount)}</strong>
-        </div>
-        <div className="space-y-1 mb-4">
-          <Label htmlFor="settle-comment">Kommentar (optional)</Label>
-          <Input
-            id="settle-comment"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="z.B. per PayPal, Bargeld..."
-            disabled={loading}
-          />
-        </div>
-        <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-          <Button variant="outline" size="sm" onClick={onClose} disabled={loading} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
-            Abbrechen
-          </Button>
-          <Button size="sm" onClick={handleConfirm} disabled={loading} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
-            <Check className="h-4 w-4 mr-1" />
-            {loading ? 'Wird markiert...' : 'Als beglichen markieren'}
-          </Button>
+
+        <div className="px-5 pt-3 pb-5" style={{ paddingBottom: `max(1.25rem, calc(1.25rem + env(safe-area-inset-bottom, 0px)))` }}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-foreground">Schulden ausgleichen</h3>
+            <button
+              onClick={onClose}
+              className="p-2 -mr-1 rounded-xl text-[var(--text-muted)] hover:bg-surface-muted active:scale-90 transition-all"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="rounded-xl bg-brand-muted border border-brand-600/20 p-3 mb-4 text-sm text-brand-700">
+            <strong>{settlement.fromUserName}</strong> zahlt <strong>{settlement.toUserName}</strong>
+            {' '}<strong className="text-brand-600">{formatCurrency(settlement.amount)}</strong>
+          </div>
+
+          <div className="space-y-1 mb-5">
+            <Label htmlFor="settle-comment">Kommentar (optional)</Label>
+            <Input
+              id="settle-comment"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="z.B. per PayPal, Bargeld..."
+              disabled={loading}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button onClick={handleConfirm} disabled={loading} className="w-full min-h-[48px]">
+              <Check className="h-4 w-4 mr-1" />
+              {loading ? 'Wird markiert...' : 'Als beglichen markieren'}
+            </Button>
+            <Button variant="outline" onClick={onClose} disabled={loading} className="w-full min-h-[44px]">
+              Abbrechen
+            </Button>
+          </div>
         </div>
       </div>
     </div>
@@ -809,26 +847,47 @@ function EditDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 overflow-y-auto">
-      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl my-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-            <Edit2 className="h-4 w-4 text-indigo-500" />
+    <div
+      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-lg max-h-[92dvh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-surface shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Drag handle (mobile) */}
+        <div className="flex justify-center pt-3 pb-1 sm:hidden shrink-0">
+          <div className="h-1 w-10 rounded-full bg-surface-border" />
+        </div>
+
+        {/* Sticky header */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-surface-border shrink-0 bg-surface">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <Edit2 className="h-4 w-4 text-brand-600" />
             Ausgabe bearbeiten
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="h-4 w-4" />
+          <button
+            onClick={onClose}
+            className="p-2 -mr-1 rounded-xl text-[var(--text-muted)] hover:bg-surface-muted active:scale-90 transition-all"
+          >
+            <X className="h-5 w-5" />
           </button>
         </div>
-        <ExpenseForm
-          members={members}
-          categories={categories}
-          currentUserId={currentUserId}
-          initialData={initialData}
-          onSubmit={(data) => onSave(expense.id, data)}
-          onCancel={onClose}
-          submitLabel="Änderungen speichern"
-        />
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto overscroll-contain flex-1 px-5 py-4">
+          <ExpenseForm
+            members={members}
+            categories={categories}
+            currentUserId={currentUserId}
+            initialData={initialData}
+            onSubmit={(data) => onSave(expense.id, data)}
+            onCancel={onClose}
+            submitLabel="Änderungen speichern"
+          />
+          {/* Bottom safe area spacer */}
+          <div className="h-[env(safe-area-inset-bottom,0px)]" />
+        </div>
       </div>
     </div>
   )
@@ -1205,32 +1264,51 @@ export default function ExpensesPage() {
 
       {/* ── Settle-All Confirmation Dialog ── */}
       {showSettleAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-gray-900">Alle Schulden begleichen</h3>
-              <button onClick={() => setShowSettleAll(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="h-4 w-4" />
-              </button>
+        <div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center"
+          onClick={() => setShowSettleAll(false)}
+        >
+          <div
+            className="w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl bg-surface shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drag handle (mobile) */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="h-1 w-10 rounded-full bg-surface-border" />
             </div>
-            <div className="rounded-lg bg-blue-50 border border-blue-100 p-3 mb-4 space-y-1">
-              {allDebtLines.map((line, i) => (
-                <p key={i} className={cn('text-xs font-medium', line.negative ? 'text-red-600' : 'text-green-600')}>
-                  {line.text}
-                </p>
-              ))}
-            </div>
-            <p className="text-sm text-gray-500 mb-4">
-              Alle offenen Schulden werden als beglichen markiert. Das kann nicht rückgängig gemacht werden.
-            </p>
-            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-              <Button variant="outline" size="sm" onClick={() => setShowSettleAll(false)} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
-                Abbrechen
-              </Button>
-              <Button size="sm" onClick={handleSettleAll} className="w-full sm:w-auto min-h-[44px] sm:min-h-0">
-                <Check className="h-4 w-4 mr-1" />
-                Alle als beglichen markieren
-              </Button>
+
+            <div className="px-5 pt-3" style={{ paddingBottom: `max(1.25rem, calc(1.25rem + env(safe-area-inset-bottom, 0px)))` }}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground">Alle Schulden begleichen</h3>
+                <button
+                  onClick={() => setShowSettleAll(false)}
+                  className="p-2 -mr-1 rounded-xl text-[var(--text-muted)] hover:bg-surface-muted active:scale-90 transition-all"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="rounded-xl bg-surface-muted border border-surface-border p-3 mb-4 space-y-1.5">
+                {allDebtLines.map((line, i) => (
+                  <p key={i} className={cn('text-sm font-medium', line.negative ? 'text-[var(--danger)]' : 'text-[var(--success)]')}>
+                    {line.text}
+                  </p>
+                ))}
+              </div>
+
+              <p className="text-sm text-[var(--text-muted)] mb-5">
+                Alle offenen Schulden werden als beglichen markiert. Das kann nicht rückgängig gemacht werden.
+              </p>
+
+              <div className="flex flex-col gap-2">
+                <Button onClick={handleSettleAll} className="w-full min-h-[48px]">
+                  <Check className="h-4 w-4 mr-1" />
+                  Alle als beglichen markieren
+                </Button>
+                <Button variant="outline" onClick={() => setShowSettleAll(false)} className="w-full min-h-[44px]">
+                  Abbrechen
+                </Button>
+              </div>
             </div>
           </div>
         </div>
