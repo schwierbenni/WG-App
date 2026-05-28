@@ -145,23 +145,9 @@ h1, h2, h3, h4, h5, h6 {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Nav safe-area spacer: only in standalone (PWA) mode.
-   In Safari browser, env(safe-area-inset-bottom) returns the toolbar height
-   (~83 px) and would create a huge white gap below the tab bar icons. */
-.nav-safe-bottom { height: 0; }
-@media (display-mode: standalone) {
-  .nav-safe-bottom { height: env(safe-area-inset-bottom, 0px); }
-}
-
 /* ─── Main scroll area bottom padding ───────────────────────────────────── */
-/* In browser mode: just clear the 64 px tab bar + a little breathing room.
-   In standalone PWA: also add the home-indicator safe-area inset. */
+/* Enough to clear the 64 px tab bar with a bit of breathing room. */
 .main-scroll-area { padding-bottom: 5rem; }
-@media (display-mode: standalone) {
-  .main-scroll-area {
-    padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom, 0px)));
-  }
-}
 @media (min-width: 640px) {
   .main-scroll-area { padding-bottom: 1.5rem; }
 }
