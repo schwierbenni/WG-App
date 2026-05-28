@@ -47,8 +47,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         />
 
         {/* Main content — extra bottom padding on mobile for the bottom nav */}
-        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-surface-muted"
-          style={{ paddingBottom: 'max(4.5rem, calc(4rem + env(safe-area-inset-bottom, 0px)))' }}>
+        {/* paddingBottom via CSS class so we can scope it to standalone PWA only */}
+        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-surface-muted main-scroll-area">
           {children}
         </main>
       </div>

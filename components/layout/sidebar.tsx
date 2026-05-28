@@ -366,8 +366,10 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
             </span>
           </button>
         </div>
-        {/* Explicit safe-area fill — covers the home-indicator zone on iPhone */}
-        <div aria-hidden="true" style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
+        {/* Safe-area spacer: only active in standalone PWA mode.
+            In Safari browser, env(safe-area-inset-bottom) includes the
+            browser toolbar (~83px) which would create a huge white gap. */}
+        <div aria-hidden="true" className="nav-safe-bottom" />
       </nav>
     </>
   )
