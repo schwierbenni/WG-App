@@ -326,12 +326,8 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
 
       {/* Bottom nav bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-surface/95 backdrop-blur-xl"
-        style={{
-          height: `calc(64px + env(safe-area-inset-bottom, 0px))`,
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          boxShadow: '0 -1px 0 0 var(--surface-border)',
-        }}
+        className="fixed bottom-0 left-0 right-0 z-30 lg:hidden bg-surface"
+        style={{ boxShadow: '0 -1px 0 0 var(--surface-border)' }}
       >
         <div className="flex items-stretch h-16">
           {bottomPrimary.map((item) => {
@@ -370,6 +366,8 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
             </span>
           </button>
         </div>
+        {/* Explicit safe-area fill — covers the home-indicator zone on iPhone */}
+        <div aria-hidden="true" style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </nav>
     </>
   )
