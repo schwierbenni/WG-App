@@ -320,9 +320,6 @@ export default function DutiesPage() {
             const canUncomplete =
               assignment?.completedAt &&
               (isAdmin || assignment.completedBy === session?.user?.id)
-            const isDueToday =
-              assignment != null &&
-              new Date(assignment.dueDate) <= new Date()
             const pendingSwap = assignment
               ? pendingOut.find((p) => p.assignmentId === assignment.id) ?? null
               : null
@@ -395,7 +392,7 @@ export default function DutiesPage() {
                         </div>
                       </div>
 
-                      {isMyAssignment && !assignment.completedAt && isDueToday && (
+                      {isMyAssignment && !assignment.completedAt && (
                         pendingSwap ? (
                           <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
                             <Clock className="h-4 w-4 text-amber-500 shrink-0" />
