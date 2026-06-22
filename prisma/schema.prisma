@@ -27,6 +27,7 @@ model WGConfig {
   spotifyPlaylists SpotifyPlaylist[]
   icalCalendars    ICalCalendar[]
   gameSessions     GameSession[]
+  wgEvents         WGEvent[]
 }
 
 model User {
@@ -56,6 +57,7 @@ model User {
   spotifyPlaylists   SpotifyPlaylist[]
   gameResults        GameResult[]
   createdGames       GameSession[]          @relation("GameCreator")
+  createdWGEvents    WGEvent[]              @relation("WGEventCreator")
 }
 
 enum Role {
@@ -244,6 +246,7 @@ enum NotificationType {
   REMINDER
   ANNOUNCEMENT
   ICAL_REMINDER
+  WG_EVENT
 }
 
 model PasswordResetToken {
@@ -347,4 +350,23 @@ model GameResult {
 enum GameType {
   SKAT
   DOPPELKOPF
+}
+
+model WGEvent {
+  id          String    @id @default(cuid())
+  wgId        String
+  createdBy   String
+  title       String
+  description String?
+  startDate   DateTime
+  endDate     DateTime?
+  allDay      Boolean   @default(false)
+  notifyWG    Boolean   @default(false)
+  color       String    @default("#6366f1")
+  emoji       String    @default("📅")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  wg      WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  creator User     @relation("WGEventCreator", fields: [createdBy], references: [id])
 }
