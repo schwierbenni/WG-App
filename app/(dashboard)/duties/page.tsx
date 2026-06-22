@@ -56,6 +56,7 @@ interface Assignment {
   id: string
   dueDate: string
   completedAt: string | null
+  completedBy: string | null
   user: SimpleUser
 }
 
@@ -316,7 +317,12 @@ export default function DutiesPage() {
             const status = getDutyStatus(assignment)
             const isMyAssignment = assignment?.user?.id === session?.user?.id
             const canComplete = assignment && !assignment.completedAt && (isMyAssignment || isAdmin)
-            const canUncomplete = assignment?.completedAt && isAdmin
+            const canUncomplete =
+              assignment?.completedAt &&
+              (isAdmin || assignment.completedBy === session?.user?.id)
+            const isDueToday =
+              assignment != null &&
+              new Date(assignment.dueDate) <= new Date()
             const pendingSwap = assignment
               ? pendingOut.find((p) => p.assignmentId === assignment.id) ?? null
               : null
@@ -326,7 +332,7 @@ export default function DutiesPage() {
                 key={duty.id}
                 className={cn(
                   'transition-shadow hover:shadow-md',
-                  status === 'überfällig' && 'border-red-200',
+                  status === 'überfällig' && 'border-red-400 bg-red-50 dark:bg-red-950/20',
                   status === 'erledigt' && 'border-green-200',
                   duty.isPaused && 'opacity-60'
                 )}
@@ -389,7 +395,7 @@ export default function DutiesPage() {
                         </div>
                       </div>
 
-                      {isMyAssignment && !assignment.completedAt && (
+                      {isMyAssignment && !assignment.completedAt && isDueToday && (
                         pendingSwap ? (
                           <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
                             <Clock className="h-4 w-4 text-amber-500 shrink-0" />

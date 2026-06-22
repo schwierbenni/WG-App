@@ -22,8 +22,10 @@ export async function GET() {
       where: { wgId, isActive: true },
       include: {
         assignments: {
-          where: { completedAt: null },
-          orderBy: { dueDate: 'asc' },
+          orderBy: [
+            { completedAt: { sort: 'asc', nulls: 'first' } },
+            { dueDate: 'desc' },
+          ],
           take: 1,
           include: {
             user: { select: { id: true, name: true, email: true, avatarUrl: true } },
