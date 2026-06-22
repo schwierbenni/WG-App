@@ -378,14 +378,18 @@ export default function CalendarPage() {
                               />
                             )
                           })}
-                          {dayIcalEvents.slice(0, 2).map((e) => (
-                            <div
-                              key={e.id}
-                              className="h-1.5 w-1.5 rounded-full"
-                              style={{ backgroundColor: e.calendar.color }}
-                              title={e.title}
-                            />
-                          ))}
+                          {dayIcalEvents.slice(0, 2).map((e) =>
+                            e.title.toLowerCase().includes('gelber sack') ? (
+                              <span key={e.id} className="text-[10px] leading-none" title={e.title}>🗑️</span>
+                            ) : (
+                              <div
+                                key={e.id}
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ backgroundColor: e.calendar.color }}
+                                title={e.title}
+                              />
+                            )
+                          )}
                           {dayWgEvents.slice(0, 2).map((e) => (
                             <div
                               key={e.id}

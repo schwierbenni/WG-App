@@ -17,10 +17,54 @@ export async function GET(request: Request) {
   const todayEnd = new Date(now)
   todayEnd.setHours(23, 59, 59, 999)
 
+  const tomorrowStart = new Date(todayStart)
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
+  const tomorrowEnd = new Date(todayEnd)
+  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
+
   let notified = 0
   const errors: string[] = []
 
   try {
+    // Vorab-Erinnerung (1 Tag vorher) für Gelber Sack
+    const tomorrowGelberSackEvents = await prisma.iCalEvent.findMany({
+      where: {
+        startDate: { gte: tomorrowStart, lte: tomorrowEnd },
+        title: { contains: 'Gelber Sack', mode: 'insensitive' },
+      },
+      include: { calendar: { select: { id: true, name: true, emoji: true, wgId: true } } },
+    })
+
+    for (const event of tomorrowGelberSackEvents) {
+      try {
+        const { wgId } = event.calendar
+        const dateStr = event.startDate.toLocaleDateString('de-DE', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          timeZone: 'Europe/Berlin',
+        })
+        const msg = `${event.title} – morgen, ${dateStr}`
+
+        const wgMembers = await prisma.user.findMany({ where: { wgId }, select: { id: true } })
+        await prisma.notification.createMany({
+          data: wgMembers.map((u) => ({
+            wgId,
+            userId: u.id,
+            type: 'ICAL_REMINDER' as const,
+            message: msg,
+            link: '/calendar',
+          })),
+        })
+        sendPushToWG(wgId, { title: `🗑️ Gelber Sack morgen`, body: msg, url: '/calendar' }).catch(() => {})
+        notified++
+        logger.info('Morgen-Erinnerung (Gelber Sack) gesendet', { eventId: event.id, title: event.title, wgId })
+      } catch (err) {
+        errors.push(`GelberSack morgen - ${event.title}: ${String(err)}`)
+        logger.error('Fehler bei Morgen-Erinnerung (Gelber Sack)', { eventId: event.id, error: String(err) })
+      }
+    }
+
     const todayIcalEvents = await prisma.iCalEvent.findMany({
       where: { startDate: { gte: todayStart, lte: todayEnd } },
       include: { calendar: { select: { id: true, name: true, emoji: true, wgId: true } } },
