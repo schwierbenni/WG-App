@@ -31,7 +31,7 @@ const mainNavItems: NavItem[] = [
 ]
 
 const adminNavItems: NavItem[] = [
-  { href: '/admin/duties',   label: 'Dienste verwalten', icon: Settings, adminOnly: true },
+  { href: '/admin/duties',   label: 'Dienstverwaltung', icon: Settings, adminOnly: true },
   { href: '/admin/members',  label: 'Mitglieder',        icon: Users,    adminOnly: true },
   { href: '/admin/wg',       label: 'WG-Einstellungen',  icon: Home,     adminOnly: true },
 ]
@@ -242,7 +242,7 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
     { href: '/profile',       label: 'Profil',      icon: User },
     ...(isAdmin
       ? [
-          { href: '/admin/duties',  label: 'Dienste',    icon: Settings },
+          { href: '/admin/duties',  label: 'Dienstverwaltung', icon: Settings },
           { href: '/admin/members', label: 'Mitglieder', icon: Users },
           { href: '/admin/wg',      label: 'WG-Einst.',  icon: Home },
         ]

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
-import { sendPushToUser } from '@/lib/push'
+import { sendPushToUser, sendPushToWG } from '@/lib/push'
 
 const patchAssignmentSchema = z.union([
   z.object({ action: z.enum(['complete', 'uncomplete']) }),
@@ -11,18 +11,6 @@ const patchAssignmentSchema = z.union([
     dueDate: z.string().datetime().optional(),
   }),
 ])
-
-function getNextDueDate(interval: string, from: Date = new Date()): Date {
-  const date = new Date(from)
-  switch (interval) {
-    case 'DAILY':    date.setDate(date.getDate() + 1);    break
-    case 'WEEKLY':   date.setDate(date.getDate() + 7);    break
-    case 'BIWEEKLY': date.setDate(date.getDate() + 14);   break
-    case 'MONTHLY':  date.setMonth(date.getMonth() + 1);  break
-    default:         date.setDate(date.getDate() + 7);    break
-  }
-  return date
-}
 
 export async function GET(
   _request: Request,
@@ -99,51 +87,28 @@ export async function PATCH(
 
     if ('action' in parsed.data && parsed.data.action === 'complete') {
       const duty = existing.duty
+      const completerName = session.user.name ?? 'Jemand'
 
-      // Notify the person who completed it
+      // Notify the completer personally
       const doneMsg = `Du hast den Dienst „${duty.name}" als erledigt markiert.`
       await prisma.notification.create({
         data: { wgId, userId: existing.userId, type: 'ASSIGNMENT', message: doneMsg },
       })
       sendPushToUser(existing.userId, { title: 'Dienst erledigt ✓', body: doneMsg, url: '/duties' }).catch(() => {})
 
-      // Auto-rotate: assign next person when completed on time (before deadline)
-      const completedOnTime = existing.dueDate >= new Date()
-      const shouldRotate =
-        completedOnTime &&
-        duty.isActive &&
-        !duty.isPaused &&
-        duty.rotationInterval !== 'MANUAL' &&
-        duty.rotationOrder.length > 0
-
-      if (shouldRotate) {
-        // Skip if another open assignment already exists for this duty
-        const alreadyOpen = await prisma.dutyAssignment.findFirst({
-          where: { dutyId: duty.id, wgId, completedAt: null, id: { not: id } },
-        })
-
-        if (!alreadyOpen) {
-          const order = duty.rotationOrder
-          const currentIndex = order.indexOf(existing.userId)
-          const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % order.length
-          const nextUserId = order[nextIndex]
-
-          const nextUser = await prisma.user.findUnique({ where: { id: nextUserId, wgId } })
-          if (nextUser) {
-            // Base next due date on the original deadline to keep the rotation on schedule
-            const dueDate = getNextDueDate(duty.rotationInterval, existing.dueDate)
-            await prisma.dutyAssignment.create({
-              data: { wgId, dutyId: duty.id, userId: nextUserId, dueDate },
+      // Notify all other WG members
+      const wgMsg = `${completerName} hat den Dienst „${duty.name}" als erledigt markiert.`
+      const wgMembers = await prisma.user.findMany({ where: { wgId } })
+      await Promise.all(
+        wgMembers
+          .filter((m) => m.id !== existing.userId)
+          .map((m) =>
+            prisma.notification.create({
+              data: { wgId, userId: m.id, type: 'ASSIGNMENT', message: wgMsg },
             })
-
-            const assignMsg = `Du bist als Nächstes für „${duty.name}" eingeteilt. Fällig: ${dueDate.toLocaleDateString('de-DE')}`
-            await prisma.notification.create({
-              data: { wgId, userId: nextUserId, type: 'ASSIGNMENT', message: assignMsg },
-            })
-            sendPushToUser(nextUserId, { title: 'Neue Zuteilung', body: assignMsg, url: '/duties' }).catch(() => {})
-          }
-        }
-      }
+          )
+      )
+      sendPushToWG(wgId, { title: 'Dienst erledigt ✓', body: wgMsg, url: '/duties' }, existing.userId).catch(() => {})
     }
 
     return Response.json({ assignment })

@@ -211,7 +211,7 @@ export default function AdminDutiesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dienste verwalten</h1>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Dienstverwaltung</h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Erstelle und bearbeite WG-Dienste</p>
         </div>
         <Button onClick={() => setCreateOpen(true)} className="gap-2">

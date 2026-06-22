@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { sendPushToUser } from '@/lib/push'
+import { sendPushToUser, sendPushToWG } from '@/lib/push'
 
 function getNextDueDate(interval: string, from: Date = new Date()): Date {
   const date = new Date(from)
@@ -43,6 +43,21 @@ export async function GET(request: Request) {
 
       const dueDate = new Date(lastAssignment.dueDate)
       if (dueDate > new Date()) continue
+
+      // If the last assignment was not completed, notify all WG members
+      if (!lastAssignment.completedAt) {
+        const overdueMsg = `Der Dienst „${duty.name}" wurde nicht rechtzeitig erledigt.`
+        const wgMembers = await prisma.user.findMany({ where: { wgId: duty.wgId } })
+        await Promise.all(
+          wgMembers.map((m) =>
+            prisma.notification.create({
+              data: { wgId: duty.wgId, userId: m.id, type: 'REMINDER', message: overdueMsg },
+            })
+          )
+        )
+        sendPushToWG(duty.wgId, { title: 'Dienst überfällig ⚠️', body: overdueMsg, url: '/duties' }).catch(() => {})
+        logger.info('Überfälligkeitsbenachrichtigung gesendet', { dutyId: duty.id, dutyName: duty.name })
+      }
 
       try {
         const currentIndex = duty.rotationOrder.indexOf(lastAssignment.userId)
