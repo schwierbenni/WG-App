@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  Home, ClipboardList, Calendar, BarChart2, Megaphone,
+  Home, ClipboardList, Calendar, Megaphone,
   ShoppingCart, CreditCard, User, Settings, Users,
   Grid3X3, X, ListMusic, Shield, ChevronRight, Dices,
 } from 'lucide-react'
@@ -22,7 +22,6 @@ const mainNavItems: NavItem[] = [
   { href: '/dashboard',     label: 'Dashboard',      icon: Home },
   { href: '/duties',        label: 'Dienste',         icon: ClipboardList },
   { href: '/calendar',      label: 'Kalender',        icon: Calendar },
-  { href: '/statistics',    label: 'Statistiken',     icon: BarChart2 },
   { href: '/announcements', label: 'Schwarzes Brett', icon: Megaphone },
   { href: '/shopping',      label: 'Einkaufsliste',   icon: ShoppingCart },
   { href: '/expenses',      label: 'Ausgaben',        icon: CreditCard },
@@ -238,7 +237,6 @@ export function BottomNav({ userRole, userEmail }: { userRole?: string; userEmai
   const moreItems: NavItem[] = [
     { href: '/announcements', label: 'Brett',       icon: Megaphone },
     { href: '/shopping',      label: 'Einkauf',     icon: ShoppingCart },
-    { href: '/statistics',    label: 'Statistiken', icon: BarChart2 },
     { href: '/games',         label: 'Spiele',      icon: Dices },
     { href: '/playlists',     label: 'Playlists',   icon: ListMusic },
     { href: '/profile',       label: 'Profil',      icon: User },

@@ -1,16 +1,8 @@
 'use client'
 
 import * as React from 'react'
+import dynamic from 'next/dynamic'
 import { useSession } from 'next-auth/react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import {
   Plus,
   RefreshCw,
@@ -41,6 +33,17 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { cn, formatDate, formatCurrency, getInitials } from '@/lib/utils'
 import { useToast } from '@/components/ui/toast'
+
+const ExpensesBarChart = dynamic(() => import('@/components/charts/ExpensesBarChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-end gap-4 h-[180px] sm:h-[220px]">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex-1 rounded bg-gray-100 animate-pulse" style={{ height: `${(i + 1) * 25}%` }} />
+      ))}
+    </div>
+  ),
+})
 
 type SplitMode = 'EQUAL' | 'INDIVIDUAL' | 'PERCENTAGE'
 
@@ -1527,15 +1530,7 @@ export default function ExpensesPage() {
               <p className="text-sm text-gray-400 py-8 text-center">Keine Daten vorhanden</p>
             ) : (
               <div className="h-[180px] sm:h-[220px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}€`} />
-                    <Tooltip formatter={(value) => [formatCurrency(Number(value)), 'Betrag']} contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', fontSize: '12px' }} />
-                    <Bar dataKey="Betrag" radius={[4, 4, 0, 0]} fill="#6366f1" />
-                  </BarChart>
-                </ResponsiveContainer>
+                <ExpensesBarChart data={chartData} />
               </div>
             )}
           </CardContent>

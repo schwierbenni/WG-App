@@ -18,6 +18,7 @@ export async function GET(request: Request) {
   const userId = searchParams.get('userId')
   const dutyId = searchParams.get('dutyId')
   const upcoming = searchParams.get('upcoming') === 'true'
+  const completed = searchParams.get('completed') === 'true'
 
   try {
     const where: Record<string, unknown> = { wgId }
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
     if (upcoming) {
       where.dueDate = { gt: new Date() }
       where.completedAt = null
+    }
+    if (completed) {
+      where.completedAt = { not: null }
     }
 
     const assignments = await prisma.dutyAssignment.findMany({
