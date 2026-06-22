@@ -47,27 +47,43 @@ export async function GET(request: Request) {
       try {
         const currentIndex = duty.rotationOrder.indexOf(lastAssignment.userId)
         const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % duty.rotationOrder.length
-        const nextUserId = duty.rotationOrder[nextIndex]
+        const scheduledUserId = duty.rotationOrder[nextIndex]
 
-        const nextUser = await prisma.user.findUnique({ where: { id: nextUserId, wgId: duty.wgId } })
-        if (!nextUser) continue
+        const scheduledUser = await prisma.user.findUnique({ where: { id: scheduledUserId, wgId: duty.wgId } })
+        if (!scheduledUser) continue
 
+        // Check for an open IOU where the scheduled user is the creditor.
+        // If found, the debitor steps in instead (pays back the duty swap).
+        const pendingIOU = await prisma.dutySwapIOU.findFirst({
+          where: { dutyId: duty.id, creditorId: scheduledUserId, redeemedAt: null },
+          orderBy: { createdAt: 'asc' },
+        })
+
+        const assignedUserId = pendingIOU ? pendingIOU.debitorId : scheduledUserId
         const nextDueDate = getNextDueDate(duty.rotationInterval)
 
         await prisma.dutyAssignment.create({
-          data: { wgId: duty.wgId, dutyId: duty.id, userId: nextUserId, dueDate: nextDueDate },
+          data: { wgId: duty.wgId, dutyId: duty.id, userId: assignedUserId, dueDate: nextDueDate },
         })
+
+        if (pendingIOU) {
+          await prisma.dutySwapIOU.update({
+            where: { id: pendingIOU.id },
+            data: { redeemedAt: new Date() },
+          })
+          logger.info('IOU eingelöst', { iouId: pendingIOU.id, debitorId: assignedUserId, creditorId: scheduledUserId, dutyId: duty.id })
+        }
 
         const cronMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${nextDueDate.toLocaleDateString('de-DE')}`
 
         await prisma.notification.create({
-          data: { wgId: duty.wgId, userId: nextUserId, type: 'ASSIGNMENT', message: cronMsg },
+          data: { wgId: duty.wgId, userId: assignedUserId, type: 'ASSIGNMENT', message: cronMsg },
         })
 
-        sendPushToUser(nextUserId, { title: 'Neue Zuteilung', body: cronMsg, url: '/duties' }).catch(() => {})
+        sendPushToUser(assignedUserId, { title: 'Neue Zuteilung', body: cronMsg, url: '/duties' }).catch(() => {})
 
         rotated++
-        logger.info('Dienst rotiert', { dutyId: duty.id, dutyName: duty.name, nextUserId, wgId: duty.wgId })
+        logger.info('Dienst rotiert', { dutyId: duty.id, dutyName: duty.name, assignedUserId, wgId: duty.wgId })
       } catch (err) {
         errors.push(`${duty.name}: ${String(err)}`)
         logger.error('Fehler bei Dienstrotation', { dutyId: duty.id, error: String(err) })
