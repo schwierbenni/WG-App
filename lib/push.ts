@@ -1,11 +1,15 @@
 import webpush from 'web-push'
 import { prisma } from './db'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT ?? 'mailto:admin@flatmate.app',
-  process.env.VAPID_PUBLIC_KEY ?? '',
-  process.env.VAPID_PRIVATE_KEY ?? ''
-)
+const vapidPublicKey = process.env.VAPID_PUBLIC_KEY
+const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT ?? 'mailto:admin@flatmate.app',
+    vapidPublicKey,
+    vapidPrivateKey
+  )
+}
 
 export interface PushPayload {
   title: string
