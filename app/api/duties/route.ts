@@ -23,7 +23,7 @@ export async function GET() {
       include: {
         assignments: {
           orderBy: [
-            { completedAt: { sort: 'asc', nulls: 'first' } },
+            { completedAt: { sort: 'desc', nulls: 'first' } },
             { dueDate: 'desc' },
           ],
           take: 1,

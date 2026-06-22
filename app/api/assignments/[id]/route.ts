@@ -98,11 +98,11 @@ export async function PATCH(
 
       // Notify all other WG members
       const wgMsg = `${completerName} hat den Dienst „${duty.name}" als erledigt markiert.`
-      const wgMembers = await prisma.user.findMany({ where: { wgId } })
+      const wgMembers = await prisma.user.findMany({ where: { wgId }, select: { id: true } })
       await Promise.all(
         wgMembers
-          .filter((m) => m.id !== existing.userId)
-          .map((m) =>
+          .filter((m: { id: string }) => m.id !== existing.userId)
+          .map((m: { id: string }) =>
             prisma.notification.create({
               data: { wgId, userId: m.id, type: 'ASSIGNMENT', message: wgMsg },
             })
