@@ -42,11 +42,12 @@ interface DutyFormProps {
   initialRotationOrder?: string[]
   members?: Member[]
   onSubmit: (values: Omit<DutyFormValues, 'checklistItems'> & { checklistItems: string[]; rotationOrder: string[] }) => Promise<void>
+  onCancel?: () => void
   isLoading?: boolean
   submitLabel?: string
 }
 
-export function DutyForm({ initialValues, initialRotationOrder, members = [], onSubmit, isLoading, submitLabel = 'Speichern' }: DutyFormProps) {
+export function DutyForm({ initialValues, initialRotationOrder, members = [], onSubmit, onCancel, isLoading, submitLabel = 'Speichern' }: DutyFormProps) {
   const [selectedEmoji, setSelectedEmoji] = useState(initialValues?.emoji ?? '')
   const [selectedColor, setSelectedColor] = useState(initialValues?.color ?? '#6366f1')
   const [rotationOrder, setRotationOrder] = useState<string[]>(initialRotationOrder ?? [])
@@ -272,10 +273,17 @@ export function DutyForm({ initialValues, initialRotationOrder, members = [], on
         </Button>
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
-        <Save className="mr-2 h-4 w-4" />
-        {isLoading ? 'Speichere…' : submitLabel}
-      </Button>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end pt-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="min-h-[44px]">
+            Abbrechen
+          </Button>
+        )}
+        <Button type="submit" disabled={isLoading} className="min-h-[44px] sm:w-auto">
+          <Save className="mr-2 h-4 w-4" />
+          {isLoading ? 'Speichere…' : submitLabel}
+        </Button>
+      </div>
     </form>
   )
 }

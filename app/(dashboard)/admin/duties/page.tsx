@@ -11,12 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+  ResponsiveModalRoot,
+  ResponsiveModalContent,
+  ResponsiveModalHeader,
+  ResponsiveModalTitle,
+  ResponsiveModalFooter,
+} from '@/components/ui/responsive-modal'
 import { DutyForm } from '@/components/duties/duty-form'
 import { getIntervalLabel } from '@/lib/utils'
 import {
@@ -327,25 +327,26 @@ export default function AdminDutiesPage() {
         </div>
       )}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Neuen Dienst erstellen</DialogTitle>
-          </DialogHeader>
+      <ResponsiveModalRoot open={createOpen} onOpenChange={setCreateOpen}>
+        <ResponsiveModalContent className="sm:max-w-2xl">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>Neuen Dienst erstellen</ResponsiveModalTitle>
+          </ResponsiveModalHeader>
           <DutyForm
             members={members}
             onSubmit={handleCreate as Parameters<typeof DutyForm>[0]['onSubmit']}
+            onCancel={() => setCreateOpen(false)}
             isLoading={actionLoading}
             submitLabel="Dienst erstellen"
           />
-        </DialogContent>
-      </Dialog>
+        </ResponsiveModalContent>
+      </ResponsiveModalRoot>
 
-      <Dialog open={!!editDuty} onOpenChange={(open) => !open && setEditDuty(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Dienst bearbeiten</DialogTitle>
-          </DialogHeader>
+      <ResponsiveModalRoot open={!!editDuty} onOpenChange={(open) => !open && setEditDuty(null)}>
+        <ResponsiveModalContent className="sm:max-w-2xl">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>Dienst bearbeiten</ResponsiveModalTitle>
+          </ResponsiveModalHeader>
           {editDuty && (
             <DutyForm
               members={members}
@@ -359,37 +360,38 @@ export default function AdminDutiesPage() {
                 checklistItems: editDuty.checklistItems.map((v) => ({ value: v })),
               }}
               onSubmit={handleEdit as Parameters<typeof DutyForm>[0]['onSubmit']}
+              onCancel={() => setEditDuty(null)}
               isLoading={actionLoading}
               submitLabel="Änderungen speichern"
             />
           )}
-        </DialogContent>
-      </Dialog>
+        </ResponsiveModalContent>
+      </ResponsiveModalRoot>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Dienst wirklich löschen?</DialogTitle>
-          </DialogHeader>
+      <ResponsiveModalRoot open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <ResponsiveModalContent className="sm:max-w-md">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>Dienst wirklich löschen?</ResponsiveModalTitle>
+          </ResponsiveModalHeader>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Der Dienst <strong>{deleteTarget?.name}</strong> und alle zugehörigen Zuweisungen werden dauerhaft gelöscht.
           </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Abbrechen</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={actionLoading}>
+          <ResponsiveModalFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} className="min-h-[44px]">Abbrechen</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={actionLoading} className="min-h-[44px]">
               {actionLoading ? 'Lösche…' : 'Löschen'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveModalFooter>
+        </ResponsiveModalContent>
+      </ResponsiveModalRoot>
 
-      <Dialog open={!!assignTarget} onOpenChange={(open) => !open && setAssignTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <ResponsiveModalRoot open={!!assignTarget} onOpenChange={(open) => !open && setAssignTarget(null)}>
+        <ResponsiveModalContent className="sm:max-w-md">
+          <ResponsiveModalHeader>
+            <ResponsiveModalTitle>
               {assignTarget?.emoji} {assignTarget?.name} — Manuell zuweisen
-            </DialogTitle>
-          </DialogHeader>
+            </ResponsiveModalTitle>
+          </ResponsiveModalHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="assign-user">Mitglied</Label>
@@ -397,7 +399,7 @@ export default function AdminDutiesPage() {
                 id="assign-user"
                 value={assignUserId}
                 onChange={(e) => setAssignUserId(e.target.value)}
-                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className="flex h-10 w-full rounded-xl border-2 border-surface-border bg-background px-3 py-2 text-base focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
                 <option value="">— Mitglied auswählen —</option>
                 {members.map((m) => (
@@ -416,17 +418,18 @@ export default function AdminDutiesPage() {
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignTarget(null)}>Abbrechen</Button>
+          <ResponsiveModalFooter>
+            <Button variant="outline" onClick={() => setAssignTarget(null)} className="min-h-[44px]">Abbrechen</Button>
             <Button
               onClick={handleAssign}
               disabled={actionLoading || !assignUserId || !assignDueDate}
+              className="min-h-[44px]"
             >
               {actionLoading ? 'Weise zu…' : 'Zuweisen'}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveModalFooter>
+        </ResponsiveModalContent>
+      </ResponsiveModalRoot>
     </div>
   )
 }
