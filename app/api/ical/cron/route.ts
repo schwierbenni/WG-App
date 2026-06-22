@@ -10,11 +10,10 @@ export async function GET(request: Request) {
 
   logger.info('iCal Erinnerungscron gestartet')
 
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const dayStart = new Date(tomorrow)
+  const now = new Date()
+  const dayStart = new Date(now)
   dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(tomorrow)
+  const dayEnd = new Date(now)
   dayEnd.setHours(23, 59, 59, 999)
 
   try {
@@ -37,8 +36,9 @@ export async function GET(request: Request) {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
+          timeZone: 'Europe/Berlin',
         })
-        const msg = `${event.title} – morgen, ${dateStr}`
+        const msg = `${event.title} – heute, ${dateStr}`
 
         const wgMembers = await prisma.user.findMany({
           where: { wgId },

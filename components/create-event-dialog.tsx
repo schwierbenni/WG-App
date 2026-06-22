@@ -288,7 +288,7 @@ export function CreateEventDialog({ open, onClose, onCreated, initialDate }: Cre
                   WG-Mitglieder benachrichtigen
                 </span>
                 <span className="text-xs text-gray-500">
-                  Sendet eine Push-Benachrichtigung bei der Erstellung und einen Tag vorher.
+                  Sendet eine Push-Benachrichtigung bei der Erstellung und am Ereignistag.
                 </span>
               </label>
             </div>

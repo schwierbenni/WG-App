@@ -55,9 +55,10 @@ model User {
   notifications      Notification[]
   pushSubscriptions  PushSubscription[]
   spotifyPlaylists   SpotifyPlaylist[]
-  gameResults        GameResult[]
-  createdGames       GameSession[]          @relation("GameCreator")
-  createdWGEvents    WGEvent[]              @relation("WGEventCreator")
+  gameResults           GameResult[]
+  createdGames          GameSession[]          @relation("GameCreator")
+  createdWGEvents       WGEvent[]              @relation("WGEventCreator")
+  assignedAnnouncements Announcement[]         @relation("AnnouncementAssignee")
 }
 
 enum Role {
@@ -132,15 +133,19 @@ enum SwapStatus {
 }
 
 model Announcement {
-  id        String   @id @default(cuid())
-  wgId      String
-  authorId  String
-  content   String
-  createdAt DateTime @default(now())
+  id             String    @id @default(cuid())
+  wgId           String
+  authorId       String
+  content        String?
+  title          String?
+  dueDate        DateTime?
+  assignedUserId String?
+  createdAt      DateTime  @default(now())
 
-  wg        WGConfig               @relation(fields: [wgId], references: [id], onDelete: Cascade)
-  author    User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  reactions AnnouncementReaction[]
+  wg           WGConfig               @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  author       User                   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  assignedUser User?                  @relation("AnnouncementAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  reactions    AnnouncementReaction[]
 }
 
 model AnnouncementReaction {
@@ -247,6 +252,7 @@ enum NotificationType {
   ANNOUNCEMENT
   ICAL_REMINDER
   WG_EVENT
+  BULLETIN_TASK
 }
 
 model PasswordResetToken {

@@ -62,6 +62,7 @@ export async function POST(request: Request) {
       weekday: 'long',
       day: 'numeric',
       month: 'long',
+      timeZone: 'Europe/Berlin',
     })
     const creatorName = session.user.name ?? 'Jemand'
     const msg = `${creatorName} hat ein neues Ereignis erstellt: ${title} – ${dateStr}`

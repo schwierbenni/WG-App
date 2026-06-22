@@ -6,7 +6,15 @@
     },
     {
       "path": "/api/calendar/cron",
-      "schedule": "0 9 * * *"
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/ical/cron",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/announcements/cron",
+      "schedule": "0 7 * * *"
     }
   ]
 }

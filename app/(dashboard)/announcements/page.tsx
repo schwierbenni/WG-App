@@ -2,67 +2,114 @@
 
 import * as React from 'react'
 import { useSession } from 'next-auth/react'
-import { Send, RefreshCw, MessageSquare } from 'lucide-react'
+import { ClipboardList, RefreshCw, Plus, Trash2, X, Calendar, User } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
-import { cn, formatDate, getInitials } from '@/lib/utils'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { cn, getInitials } from '@/lib/utils'
 
-interface Author {
+interface WGUser {
   id: string
   name: string
-  email: string
   avatarUrl: string | null
 }
 
-interface Reaction {
+interface BulletinTask {
   id: string
-  userId: string
-  emoji: string
-}
-
-interface Announcement {
-  id: string
-  content: string
+  title: string | null
+  content: string | null
+  dueDate: string | null
   createdAt: string
-  author: Author
-  reactions: Reaction[]
-  reactionCounts: Record<string, number>
+  author: {
+    id: string
+    name: string
+    avatarUrl: string | null
+  }
+  assignedUser: {
+    id: string
+    name: string
+    avatarUrl: string | null
+  } | null
 }
 
-const REACTION_EMOJIS = ['👍', '❤️', '😂', '🎉']
-const MAX_LENGTH = 500
+type TaskStatus = 'overdue' | 'today' | 'upcoming'
 
-function RelativeTime({ date }: { date: string }) {
-  const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-  if (diff < 60) return <>gerade eben</>
-  if (diff < 3600) return <>vor {Math.floor(diff / 60)} Min.</>
-  if (diff < 86400) return <>vor {Math.floor(diff / 3600)} Std.</>
-  if (diff < 604800) return <>vor {Math.floor(diff / 86400)} Tagen</>
-  return <>{new Date(date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</>
+function getTaskStatus(dueDate: string | null): TaskStatus {
+  if (!dueDate) return 'upcoming'
+  const due = new Date(dueDate)
+  const now = new Date()
+  const todayStart = new Date(now)
+  todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(now)
+  todayEnd.setHours(23, 59, 59, 999)
+  if (due < todayStart) return 'overdue'
+  if (due <= todayEnd) return 'today'
+  return 'upcoming'
+}
+
+const STATUS_STYLES: Record<TaskStatus, { badge: string; border: string; dot: string; label: string }> = {
+  overdue: {
+    badge: 'bg-red-100 text-red-700 border-red-200',
+    border: 'border-red-200',
+    dot: 'bg-red-500',
+    label: 'Überfällig',
+  },
+  today: {
+    badge: 'bg-orange-100 text-orange-700 border-orange-200',
+    border: 'border-orange-200',
+    dot: 'bg-orange-400',
+    label: 'Heute fällig',
+  },
+  upcoming: {
+    badge: 'bg-blue-50 text-blue-700 border-blue-100',
+    border: 'border-gray-200',
+    dot: 'bg-blue-400',
+    label: 'Offen',
+  },
+}
+
+function formatDueDate(dueDate: string | null): string {
+  if (!dueDate) return '–'
+  return new Date(dueDate).toLocaleDateString('de-DE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
 }
 
 export default function AnnouncementsPage() {
   const { data: session } = useSession()
-  const [announcements, setAnnouncements] = React.useState<Announcement[]>([])
+  const [tasks, setTasks] = React.useState<BulletinTask[]>([])
+  const [users, setUsers] = React.useState<WGUser[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
-  const [content, setContent] = React.useState('')
+  const [showForm, setShowForm] = React.useState(false)
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
+
+  const [title, setTitle] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  const [dueDate, setDueDate] = React.useState('')
+  const [assignedUserId, setAssignedUserId] = React.useState('')
   const [submitting, setSubmitting] = React.useState(false)
   const [submitError, setSubmitError] = React.useState('')
-  const [reactionLoading, setReactionLoading] = React.useState<string | null>(null)
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/announcements')
-      if (!res.ok) throw new Error('Fehler beim Laden')
-      const data = await res.json()
-      setAnnouncements(data.announcements ?? [])
+      const [tasksRes, usersRes] = await Promise.all([
+        fetch('/api/announcements'),
+        fetch('/api/users'),
+      ])
+      if (!tasksRes.ok) throw new Error('Fehler beim Laden')
+      const tasksData = await tasksRes.json()
+      setTasks(tasksData.announcements ?? [])
+      if (usersRes.ok) {
+        const usersData = await usersRes.json()
+        setUsers(usersData.users ?? [])
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -74,22 +121,39 @@ export default function AnnouncementsPage() {
     fetchData()
   }, [fetchData])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  function openForm() {
+    setTitle('')
+    setDescription('')
+    setDueDate('')
+    setAssignedUserId('')
+    setSubmitError('')
+    setShowForm(true)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!content.trim() || content.length > MAX_LENGTH) return
+    if (!title.trim()) { setSubmitError('Bitte einen Titel eingeben'); return }
+    if (!dueDate) { setSubmitError('Bitte einen Stichtag eingeben'); return }
+    if (!assignedUserId) { setSubmitError('Bitte eine verantwortliche Person auswählen'); return }
+
     setSubmitting(true)
     setSubmitError('')
     try {
       const res = await fetch('/api/announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content.trim() }),
+        body: JSON.stringify({
+          title: title.trim(),
+          content: description.trim() || undefined,
+          dueDate: new Date(`${dueDate}T00:00:00`).toISOString(),
+          assignedUserId,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
-        setSubmitError(data.error ?? 'Fehler beim Senden')
+        setSubmitError(data.error ?? 'Fehler beim Erstellen')
       } else {
-        setContent('')
+        setShowForm(false)
         fetchData()
       }
     } catch {
@@ -99,58 +163,19 @@ export default function AnnouncementsPage() {
     }
   }
 
-  const handleReaction = async (announcementId: string, emoji: string) => {
-    const key = `${announcementId}-${emoji}`
-    setReactionLoading(key)
+  async function handleDelete(id: string) {
+    setDeletingId(id)
     try {
-      const res = await fetch(`/api/announcements/${announcementId}/reactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emoji }),
-      })
-      if (res.ok) {
-        setAnnouncements((prev) =>
-          prev.map((a) => {
-            if (a.id !== announcementId) return a
-            const myReaction = a.reactions.find(
-              (r) => r.userId === session?.user?.id && r.emoji === emoji
-            )
-            let reactions: Reaction[]
-            let reactionCounts: Record<string, number>
-
-            if (myReaction) {
-              reactions = a.reactions.filter((r) => r.id !== myReaction.id)
-              reactionCounts = {
-                ...a.reactionCounts,
-                [emoji]: Math.max(0, (a.reactionCounts[emoji] ?? 1) - 1),
-              }
-            } else {
-              const newReaction: Reaction = {
-                id: Date.now().toString(),
-                userId: session?.user?.id ?? '',
-                emoji,
-              }
-              reactions = [...a.reactions, newReaction]
-              reactionCounts = {
-                ...a.reactionCounts,
-                [emoji]: (a.reactionCounts[emoji] ?? 0) + 1,
-              }
-            }
-            return { ...a, reactions, reactionCounts }
-          })
-        )
-      }
-    } catch {
-      // ignore
+      await fetch(`/api/announcements/${id}`, { method: 'DELETE' })
+      setTasks((prev) => prev.filter((t) => t.id !== id))
     } finally {
-      setReactionLoading(null)
+      setDeletingId(null)
     }
   }
 
-  const hasMyReaction = (announcement: Announcement, emoji: string) => {
-    return announcement.reactions.some(
-      (r) => r.userId === session?.user?.id && r.emoji === emoji
-    )
+  const canDelete = (task: BulletinTask) => {
+    const userRole = (session?.user as { role?: string })?.role
+    return task.author.id === session?.user?.id || userRole === 'ADMIN'
   }
 
   return (
@@ -158,55 +183,111 @@ export default function AnnouncementsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schwarzes Brett</h1>
-          <p className="text-sm text-gray-500 mt-1">Ankündigungen und Mitteilungen</p>
+          <p className="text-sm text-gray-500 mt-1">Aufgaben mit Stichtag und Verantwortlichkeit</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
-          <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          <span className="hidden sm:inline">Aktualisieren</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+            <span className="hidden sm:inline">Aktualisieren</span>
+          </Button>
+          <Button size="sm" onClick={openForm}>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Neue Aufgabe</span>
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-indigo-500" />
-            <h2 className="text-base font-semibold text-gray-900">Neue Ankündigung</h2>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="relative">
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Was möchtest du mitteilen?"
-                rows={4}
-                maxLength={MAX_LENGTH}
-                className="resize-none pr-16 text-base sm:text-sm min-h-[100px]"
-              />
-              <span
-                className={cn(
-                  'absolute bottom-2 right-2 text-xs',
-                  content.length > MAX_LENGTH * 0.9 ? 'text-red-500' : 'text-gray-400'
-                )}
-              >
-                {content.length}/{MAX_LENGTH}
-              </span>
+      {/* New Task Form */}
+      {showForm && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-indigo-500" />
+                <h2 className="text-base font-semibold text-gray-900">Neue Aufgabe</h2>
+              </div>
+              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            {submitError && (
-              <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2">{submitError}</p>
-            )}
-            <Button
-              type="submit"
-              disabled={submitting || !content.trim() || content.length > MAX_LENGTH}
-              className="w-full sm:w-auto sm:ml-auto sm:flex min-h-[44px]"
-            >
-              <Send className="h-4 w-4" />
-              {submitting ? 'Sende...' : 'Veröffentlichen'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Titel *</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="z.B. Waschmaschine reparieren lassen"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Beschreibung</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Optionale Details zur Aufgabe…"
+                  rows={3}
+                  maxLength={500}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 resize-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stichtag *</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Verantwortlich *</label>
+                  <select
+                    value={assignedUserId}
+                    onChange={(e) => setAssignedUserId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                  >
+                    <option value="">Person auswählen…</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-700">
+                Die zugewiesene Person erhält sofort eine Push-Benachrichtigung, 1 Woche vor Ablauf und am Stichtag um 9 Uhr.
+              </div>
+
+              {submitError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-xl p-2">{submitError}</p>
+              )}
+
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={() => setShowForm(false)}>
+                  Abbrechen
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1"
+                >
+                  {submitting ? 'Erstelle…' : 'Aufgabe erstellen'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -214,7 +295,7 @@ export default function AnnouncementsPage() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {loading ? (
           Array.from({ length: 3 }).map((_, i) => (
             <Card key={i}>
@@ -222,85 +303,95 @@ export default function AnnouncementsPage() {
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-9 w-9 rounded-full" />
                   <div className="space-y-1 flex-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-20" />
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
                   </div>
+                  <Skeleton className="h-6 w-20 rounded-full" />
                 </div>
-                <Skeleton className="h-16 w-full" />
               </CardContent>
             </Card>
           ))
-        ) : announcements.length === 0 ? (
+        ) : tasks.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-            <MessageSquare className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-gray-500 font-medium">Keine Ankündigungen</p>
-            <p className="text-sm text-gray-400 mt-1">Schreibe die erste Nachricht!</p>
+            <ClipboardList className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+            <p className="text-gray-500 font-medium">Keine Aufgaben</p>
+            <p className="text-sm text-gray-400 mt-1">Erstelle die erste Aufgabe!</p>
           </div>
         ) : (
-          announcements.map((announcement) => (
-            <Card key={announcement.id} className="overflow-hidden">
-              <CardContent className="pt-4">
-                <div className="flex items-start gap-3">
-                  <Avatar className="h-9 w-9 shrink-0">
-                    {announcement.author.avatarUrl && (
-                      <AvatarImage
-                        src={announcement.author.avatarUrl}
-                        alt={announcement.author.name}
-                      />
-                    )}
-                    <AvatarFallback className="text-sm bg-indigo-100 text-indigo-700">
-                      {getInitials(announcement.author.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-semibold text-gray-900">
-                        {announcement.author.name}
-                        {announcement.author.id === session?.user?.id && (
-                          <span className="ml-1 text-indigo-500 font-normal text-xs">(Du)</span>
+          tasks.map((task) => {
+            const status = getTaskStatus(task.dueDate)
+            const styles = STATUS_STYLES[status]
+            return (
+              <Card key={task.id} className={cn('overflow-hidden border', styles.border)}>
+                <CardContent className="pt-4">
+                  <div className="flex items-start gap-3">
+                    <div className={cn('mt-1.5 h-2.5 w-2.5 rounded-full flex-shrink-0', styles.dot)} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-gray-900 leading-snug">
+                          {task.title ?? task.content ?? '(Kein Titel)'}
+                        </h3>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <span className={cn(
+                            'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium',
+                            styles.badge
+                          )}>
+                            {styles.label}
+                          </span>
+                          {canDelete(task) && (
+                            <button
+                              onClick={() => handleDelete(task.id)}
+                              disabled={deletingId === task.id}
+                              className="text-gray-300 hover:text-red-400 transition-colors disabled:opacity-40 p-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {task.content && (
+                        <p className="mt-1 text-sm text-gray-500 whitespace-pre-wrap line-clamp-3">
+                          {task.content}
+                        </p>
+                      )}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
+                        {task.dueDate && (
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3.5 w-3.5" />
+                            <span>{formatDueDate(task.dueDate)}</span>
+                          </div>
                         )}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        <RelativeTime date={announcement.createdAt} />
-                      </span>
+                        {task.assignedUser && (
+                          <div className="flex items-center gap-1.5">
+                            <User className="h-3.5 w-3.5" />
+                            <Avatar className="h-5 w-5">
+                              {task.assignedUser.avatarUrl && (
+                                <AvatarImage src={task.assignedUser.avatarUrl} alt={task.assignedUser.name} />
+                              )}
+                              <AvatarFallback className="text-[10px] bg-indigo-100 text-indigo-700">
+                                {getInitials(task.assignedUser.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="font-medium text-gray-700">
+                              {task.assignedUser.name}
+                              {task.assignedUser.id === session?.user?.id && (
+                                <span className="ml-1 text-indigo-500">(Du)</span>
+                              )}
+                            </span>
+                          </div>
+                        )}
+                        <span className="text-gray-400">
+                          von {task.author.name}
+                        </span>
+                      </div>
                     </div>
-                    <p className="mt-2 text-sm text-gray-700 whitespace-pre-wrap">
-                      {announcement.content}
-                    </p>
                   </div>
-                </div>
-
-                <Separator className="mt-4 mb-3" />
-
-                <div className="flex flex-wrap gap-2">
-                  {REACTION_EMOJIS.map((emoji) => {
-                    const count = announcement.reactionCounts[emoji] ?? 0
-                    const mine = hasMyReaction(announcement, emoji)
-                    const loadingKey = `${announcement.id}-${emoji}`
-                    return (
-                      <button
-                        key={emoji}
-                        onClick={() => handleReaction(announcement.id, emoji)}
-                        disabled={reactionLoading === loadingKey}
-                        className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-sm transition-all min-h-[44px] min-w-[44px] active:scale-90',
-                          mine
-                            ? 'border-indigo-300 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                            : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50',
-                          reactionLoading === loadingKey && 'opacity-50 cursor-wait'
-                        )}
-                      >
-                        <span className="text-base">{emoji}</span>
-                        {count > 0 && (
-                          <span className="text-sm font-medium">{count}</span>
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
     </div>

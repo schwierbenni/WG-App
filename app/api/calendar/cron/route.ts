@@ -17,19 +17,10 @@ export async function GET(request: Request) {
   const todayEnd = new Date(now)
   todayEnd.setHours(23, 59, 59, 999)
 
-  const tomorrow = new Date(now)
-  tomorrow.setDate(now.getDate() + 1)
-  const tomorrowStart = new Date(tomorrow)
-  tomorrowStart.setHours(0, 0, 0, 0)
-  const tomorrowEnd = new Date(tomorrow)
-  tomorrowEnd.setHours(23, 59, 59, 999)
-
   let notified = 0
   const errors: string[] = []
 
   try {
-    // === HEUTE: Push für alle Ereignisse an alle WG-Mitglieder mit Push-Abonnement ===
-
     const todayIcalEvents = await prisma.iCalEvent.findMany({
       where: { startDate: { gte: todayStart, lte: todayEnd } },
       include: { calendar: { select: { id: true, name: true, emoji: true, wgId: true } } },
@@ -42,6 +33,7 @@ export async function GET(request: Request) {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
+          timeZone: 'Europe/Berlin',
         })
         const msg = `${event.title} – heute, ${dateStr}`
 
@@ -74,6 +66,7 @@ export async function GET(request: Request) {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
+          timeZone: 'Europe/Berlin',
         })
         const msg = `${event.title} – heute, ${dateStr}`
 
@@ -93,77 +86,6 @@ export async function GET(request: Request) {
       } catch (err) {
         errors.push(`WGEvent heute - ${event.title}: ${String(err)}`)
         logger.error('Fehler bei Heute-Erinnerung (WGEvent)', { eventId: event.id, error: String(err) })
-      }
-    }
-
-    // === MORGEN: 1-Tag-vorher-Erinnerungen ===
-
-    const tomorrowIcalEvents = await prisma.iCalEvent.findMany({
-      where: { startDate: { gte: tomorrowStart, lte: tomorrowEnd } },
-      include: { calendar: { select: { id: true, name: true, emoji: true, wgId: true } } },
-    })
-
-    for (const event of tomorrowIcalEvents) {
-      try {
-        const { wgId, emoji, name: calName } = event.calendar
-        const dateStr = event.startDate.toLocaleDateString('de-DE', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        })
-        const msg = `${event.title} – morgen, ${dateStr}`
-
-        const wgMembers = await prisma.user.findMany({ where: { wgId }, select: { id: true } })
-        await prisma.notification.createMany({
-          data: wgMembers.map((u) => ({
-            wgId,
-            userId: u.id,
-            type: 'ICAL_REMINDER' as const,
-            message: msg,
-            link: '/calendar',
-          })),
-        })
-        sendPushToWG(wgId, { title: `${emoji} ${calName}`, body: msg, url: '/calendar' }).catch(() => {})
-        notified++
-        logger.info('Morgen-Erinnerung (iCal) gesendet', { eventId: event.id, title: event.title, wgId })
-      } catch (err) {
-        errors.push(`iCal morgen - ${event.title}: ${String(err)}`)
-        logger.error('Fehler bei Morgen-Erinnerung (iCal)', { eventId: event.id, error: String(err) })
-      }
-    }
-
-    const tomorrowWgEvents = await prisma.wGEvent.findMany({
-      where: {
-        notifyWG: true,
-        startDate: { gte: tomorrowStart, lte: tomorrowEnd },
-      },
-    })
-
-    for (const event of tomorrowWgEvents) {
-      try {
-        const dateStr = event.startDate.toLocaleDateString('de-DE', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        })
-        const msg = `${event.title} – morgen, ${dateStr}`
-
-        const wgMembers = await prisma.user.findMany({ where: { wgId: event.wgId }, select: { id: true } })
-        await prisma.notification.createMany({
-          data: wgMembers.map((u) => ({
-            wgId: event.wgId,
-            userId: u.id,
-            type: 'WG_EVENT' as const,
-            message: msg,
-            link: '/calendar',
-          })),
-        })
-        sendPushToWG(event.wgId, { title: `${event.emoji} WG-Ereignis morgen`, body: msg, url: '/calendar' }).catch(() => {})
-        notified++
-        logger.info('Morgen-Erinnerung (WGEvent) gesendet', { eventId: event.id, title: event.title, wgId: event.wgId })
-      } catch (err) {
-        errors.push(`WGEvent morgen - ${event.title}: ${String(err)}`)
-        logger.error('Fehler bei Morgen-Erinnerung (WGEvent)', { eventId: event.id, error: String(err) })
       }
     }
 
