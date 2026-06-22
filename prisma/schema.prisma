@@ -17,6 +17,7 @@ model WGConfig {
   duties           Duty[]
   assignments      DutyAssignment[]
   swapRequests     SwapRequest[]
+  dutySwapIOUs     DutySwapIOU[]
   announcements    Announcement[]
   shoppingItems    ShoppingItem[]
   expenses         Expense[]
@@ -46,6 +47,8 @@ model User {
   assignments        DutyAssignment[]
   swapRequestsFrom   SwapRequest[]          @relation("SwapFrom")
   swapRequestsTo     SwapRequest[]          @relation("SwapTo")
+  iouAsDebitor       DutySwapIOU[]          @relation("IouDebitor")
+  iouAsCreditor      DutySwapIOU[]          @relation("IouCreditor")
   announcements      Announcement[]
   reactions          AnnouncementReaction[]
   shoppingItems      ShoppingItem[]
@@ -83,6 +86,22 @@ model Duty {
 
   wg          WGConfig         @relation(fields: [wgId], references: [id], onDelete: Cascade)
   assignments DutyAssignment[]
+  swapIOUs    DutySwapIOU[]
+}
+
+model DutySwapIOU {
+  id          String    @id @default(cuid())
+  wgId        String
+  dutyId      String
+  debitorId   String
+  creditorId  String
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  wg       WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
+  duty     Duty     @relation(fields: [dutyId], references: [id], onDelete: Cascade)
+  debitor  User     @relation("IouDebitor", fields: [debitorId], references: [id], onDelete: Cascade)
+  creditor User     @relation("IouCreditor", fields: [creditorId], references: [id], onDelete: Cascade)
 }
 
 enum RotationInterval {

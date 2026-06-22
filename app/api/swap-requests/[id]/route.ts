@@ -92,16 +92,16 @@ export async function PATCH(
         data: { userId: swapRequest.toUserId },
       })
 
-      // Swap the two users' positions in the duty's rotation order
-      const duty = swapRequest.assignment.duty
-      const order = duty.rotationOrder
-      const fromIdx = order.indexOf(swapRequest.fromUserId)
-      const toIdx = order.indexOf(swapRequest.toUserId)
-      if (fromIdx !== -1 && toIdx !== -1) {
-        const newOrder = [...order]
-        ;[newOrder[fromIdx], newOrder[toIdx]] = [newOrder[toIdx], newOrder[fromIdx]]
-        await prisma.duty.update({ where: { id: duty.id }, data: { rotationOrder: newOrder } })
-      }
+      // Create a one-time IOU: debitor (fromUser/A) owes creditor (toUser/C) one duty back.
+      // The next time C would be scheduled, A steps in instead, then both return to original rotation.
+      await prisma.dutySwapIOU.create({
+        data: {
+          wgId,
+          dutyId: swapRequest.assignment.dutyId,
+          debitorId: swapRequest.fromUserId,
+          creditorId: swapRequest.toUserId,
+        },
+      })
 
       const acceptMsg = `${swapRequest.toUser.name} hat deinen Tausch für "${swapRequest.assignment.duty.name}" angenommen.`
       const assignMsg = `Du wurdest nach dem Tausch für "${swapRequest.assignment.duty.name}" eingeteilt.`
