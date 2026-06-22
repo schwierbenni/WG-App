@@ -10,11 +10,14 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { calculateDebts, type Debt } from '@/lib/games'
 import { getInitials } from '@/lib/utils'
+import { Leaderboard } from '@/components/games/leaderboard'
 
 type Step = 'select-game' | 'setup' | 'confirm' | 'success'
 type GameType = 'SKAT' | 'DOPPELKOPF'
+type MainTab = 'spielen' | 'leaderboard'
 
 interface WgUser {
   id: string
@@ -51,6 +54,7 @@ function formatDate(iso: string): string {
 }
 
 export default function GamesPage() {
+  const [mainTab, setMainTab] = useState<MainTab>('spielen')
   const [step, setStep] = useState<Step>('select-game')
   const [gameType, setGameType] = useState<GameType>('SKAT')
   const [multiplier, setMultiplier] = useState('1')
@@ -236,6 +240,20 @@ export default function GamesPage() {
           Spiele
         </h1>
       </div>
+
+      {/* Main tabs */}
+      <div className="overflow-x-auto [scrollbar-width:none] [-webkit-overflow-scrolling:touch] -mx-4 px-4 sm:mx-0 sm:px-0">
+        <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as MainTab)}>
+          <TabsList className="inline-flex w-auto">
+            <TabsTrigger value="spielen" className="min-h-[40px]">Spielen</TabsTrigger>
+            <TabsTrigger value="leaderboard" className="min-h-[40px]">Leaderboard</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="leaderboard" className="mt-4">
+            <Leaderboard />
+          </TabsContent>
+
+          <TabsContent value="spielen" className="mt-4 space-y-6">
 
       {/* Error banner */}
       {error && (
@@ -577,6 +595,10 @@ export default function GamesPage() {
             )
           })
         )}
+      </div>
+
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )
