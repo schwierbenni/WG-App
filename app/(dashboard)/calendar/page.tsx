@@ -16,13 +16,15 @@ import {
   isPast,
 } from 'date-fns'
 import { de } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, RefreshCw, CalendarPlus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw, CalendarPlus, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { ICalImportDialog } from '@/components/ical-import-dialog'
+import { CreateEventDialog, CreatedWGEvent } from '@/components/create-event-dialog'
+import { useSession } from 'next-auth/react'
 
 interface Assignment {
   id: string
@@ -55,6 +57,21 @@ interface ICalEvent {
   }
 }
 
+interface WGEvent {
+  id: string
+  wgId: string
+  title: string
+  description: string | null
+  startDate: string
+  endDate: string | null
+  allDay: boolean
+  color: string
+  emoji: string
+  notifyWG: boolean
+  createdBy: string
+  creator: { id: string; name: string }
+}
+
 type AssignmentStatus = 'offen' | 'erledigt' | 'überfällig'
 
 function getStatus(assignment: Assignment): AssignmentStatus {
@@ -76,28 +93,37 @@ const DOT_COLORS: Record<AssignmentStatus, string> = {
 }
 
 export default function CalendarPage() {
+  const { data: session } = useSession()
   const [currentMonth, setCurrentMonth] = React.useState(new Date())
   const [assignments, setAssignments] = React.useState<Assignment[]>([])
   const [icalEvents, setIcalEvents] = React.useState<ICalEvent[]>([])
+  const [wgEvents, setWgEvents] = React.useState<WGEvent[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState('')
   const [selectedDay, setSelectedDay] = React.useState<Date | null>(null)
   const [importOpen, setImportOpen] = React.useState(false)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
   const fetchData = React.useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const [assignRes, icalRes] = await Promise.all([
+      const [assignRes, icalRes, wgEventsRes] = await Promise.all([
         fetch('/api/assignments'),
         fetch('/api/ical/events'),
+        fetch('/api/calendar/events'),
       ])
-      if (!assignRes.ok) throw new Error('Fehler beim Laden der Zumweisungen')
+      if (!assignRes.ok) throw new Error('Fehler beim Laden der Zuweisungen')
       const assignData = await assignRes.json()
       setAssignments(assignData.assignments ?? [])
       if (icalRes.ok) {
         const icalData = await icalRes.json()
         setIcalEvents(icalData.events ?? [])
+      }
+      if (wgEventsRes.ok) {
+        const wgData = await wgEventsRes.json()
+        setWgEvents(wgData.events ?? [])
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
@@ -109,6 +135,20 @@ export default function CalendarPage() {
   React.useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  async function handleDeleteWgEvent(id: string) {
+    setDeletingId(id)
+    try {
+      await fetch(`/api/calendar/events/${id}`, { method: 'DELETE' })
+      setWgEvents((prev) => prev.filter((e) => e.id !== id))
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  function handleEventCreated(event: CreatedWGEvent) {
+    setWgEvents((prev) => [...prev, event as WGEvent])
+  }
 
   const calendarDays = React.useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 })
@@ -138,6 +178,17 @@ export default function CalendarPage() {
     return map
   }, [icalEvents])
 
+  const wgEventsByDay = React.useMemo(() => {
+    const map = new Map<string, WGEvent[]>()
+    for (const e of wgEvents) {
+      const key = format(new Date(e.startDate), 'yyyy-MM-dd')
+      const existing = map.get(key) ?? []
+      existing.push(e)
+      map.set(key, existing)
+    }
+    return map
+  }, [wgEvents])
+
   const selectedDayAssignments = React.useMemo(() => {
     if (!selectedDay) return []
     const key = format(selectedDay, 'yyyy-MM-dd')
@@ -150,7 +201,12 @@ export default function CalendarPage() {
     return icalEventsByDay.get(key) ?? []
   }, [selectedDay, icalEventsByDay])
 
-  // Collect unique calendars for the legend
+  const selectedDayWgEvents = React.useMemo(() => {
+    if (!selectedDay) return []
+    const key = format(selectedDay, 'yyyy-MM-dd')
+    return wgEventsByDay.get(key) ?? []
+  }, [selectedDay, wgEventsByDay])
+
   const uniqueCalendars = React.useMemo(() => {
     const seen = new Map<string, ICalEvent['calendar']>()
     for (const e of icalEvents) {
@@ -172,6 +228,10 @@ export default function CalendarPage() {
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <CalendarPlus className="h-4 w-4" />
             <span className="hidden sm:inline">Kalender importieren</span>
+          </Button>
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">Ereignis erstellen</span>
           </Button>
           <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>
             <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
@@ -205,6 +265,12 @@ export default function CalendarPage() {
             <span className="text-gray-500">{cal.emoji} {cal.name}</span>
           </div>
         ))}
+        {wgEvents.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <div className="h-2.5 w-2.5 rounded-full bg-indigo-500" />
+            <span className="text-gray-500">WG-Ereignisse</span>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -266,9 +332,11 @@ export default function CalendarPage() {
                   const key = format(day, 'yyyy-MM-dd')
                   const dayAssignments = assignmentsByDay.get(key) ?? []
                   const dayIcalEvents = icalEventsByDay.get(key) ?? []
+                  const dayWgEvents = wgEventsByDay.get(key) ?? []
                   const isCurrentMonth = isSameMonth(day, currentMonth)
                   const isSelected = selectedDay ? isSameDay(day, selectedDay) : false
                   const today = isToday(day)
+                  const totalEvents = dayAssignments.length + dayIcalEvents.length + dayWgEvents.length
 
                   return (
                     <button
@@ -298,7 +366,7 @@ export default function CalendarPage() {
                         </span>
                       )}
 
-                      {(dayAssignments.length > 0 || dayIcalEvents.length > 0) && (
+                      {totalEvents > 0 && (
                         <div className="flex flex-wrap gap-0.5 mt-0.5">
                           {dayAssignments.slice(0, 2).map((a) => {
                             const status = getStatus(a)
@@ -318,9 +386,17 @@ export default function CalendarPage() {
                               title={e.title}
                             />
                           ))}
-                          {(dayAssignments.length + dayIcalEvents.length) > 4 && (
+                          {dayWgEvents.slice(0, 2).map((e) => (
+                            <div
+                              key={e.id}
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: e.color }}
+                              title={e.title}
+                            />
+                          ))}
+                          {totalEvents > 4 && (
                             <span className="text-xs text-gray-400">
-                              +{dayAssignments.length + dayIcalEvents.length - 4}
+                              +{totalEvents - 4}
                             </span>
                           )}
                         </div>
@@ -335,18 +411,31 @@ export default function CalendarPage() {
 
         <Card>
           <CardHeader className="pb-2">
-            <h2 className="text-base font-semibold text-gray-900">
-              {selectedDay
-                ? format(selectedDay, 'EEEE, d. MMMM', { locale: de })
-                : 'Tag auswählen'}
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900">
+                {selectedDay
+                  ? format(selectedDay, 'EEEE, d. MMMM', { locale: de })
+                  : 'Tag auswählen'}
+              </h2>
+              {selectedDay && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Neu
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {!selectedDay ? (
               <p className="text-sm text-gray-400 py-4 text-center">
                 Klicke auf einen Tag um Details zu sehen
               </p>
-            ) : selectedDayAssignments.length === 0 && selectedDayIcalEvents.length === 0 ? (
+            ) : selectedDayAssignments.length === 0 && selectedDayIcalEvents.length === 0 && selectedDayWgEvents.length === 0 ? (
               <p className="text-sm text-gray-400 py-4 text-center">
                 Keine Einträge an diesem Tag
               </p>
@@ -402,6 +491,44 @@ export default function CalendarPage() {
                     <p className="text-xs text-gray-400">{event.calendar.name}</p>
                   </div>
                 ))}
+
+                {selectedDayWgEvents.map((event) => {
+                  const canDelete =
+                    session?.user?.id === event.createdBy ||
+                    (session?.user as { role?: string })?.role === 'ADMIN'
+                  return (
+                    <div
+                      key={event.id}
+                      className="rounded-lg border p-3 space-y-1"
+                      style={{
+                        backgroundColor: event.color + '18',
+                        borderColor: event.color + '44',
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-base leading-none flex-shrink-0">{event.emoji}</span>
+                          <span className="text-sm font-semibold truncate" style={{ color: event.color }}>
+                            {event.title}
+                          </span>
+                        </div>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteWgEvent(event.id)}
+                            disabled={deletingId === event.id}
+                            className="text-gray-300 hover:text-red-400 transition-colors disabled:opacity-40 flex-shrink-0"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {event.description && (
+                        <p className="text-xs text-gray-500 line-clamp-2">{event.description}</p>
+                      )}
+                      <p className="text-xs text-gray-400">von {event.creator.name}</p>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardContent>
@@ -412,6 +539,13 @@ export default function CalendarPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={fetchData}
+      />
+
+      <CreateEventDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={handleEventCreated}
+        initialDate={selectedDay}
       />
     </div>
   )
