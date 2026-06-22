@@ -17,15 +17,13 @@ export async function GET() {
     const items = await prisma.shoppingItem.findMany({
       where: { wgId },
       include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
-      orderBy: [{ boughtAt: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [
+        { boughtAt: { sort: 'asc', nulls: 'first' } },
+        { createdAt: 'asc' },
+      ],
     })
 
-    const sorted = [
-      ...items.filter((i: { boughtAt: Date | null }) => !i.boughtAt),
-      ...items.filter((i: { boughtAt: Date | null }) => i.boughtAt),
-    ]
-
-    return Response.json({ items: sorted })
+    return Response.json({ items })
   } catch (error) {
     console.error('GET shopping error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

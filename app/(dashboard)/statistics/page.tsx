@@ -1,16 +1,19 @@
 'use client'
 
 import * as React from 'react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
+import dynamic from 'next/dynamic'
 import { Trophy, TrendingUp, RefreshCw, Users } from 'lucide-react'
+
+const StatisticsBarChart = dynamic(() => import('@/components/charts/StatisticsBarChart'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-end gap-4 h-[240px]">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="flex-1 rounded bg-gray-100 animate-pulse" style={{ height: `${(i + 1) * 25}%` }} />
+      ))}
+    </div>
+  ),
+})
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -59,11 +62,10 @@ export default function StatisticsPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/assignments')
+      const res = await fetch('/api/assignments?completed=true')
       if (!res.ok) throw new Error('Fehler beim Laden der Daten')
       const data = await res.json()
-      const completed = (data.assignments as Assignment[]).filter((a) => a.completedAt !== null)
-      setAssignments(completed)
+      setAssignments(data.assignments as Assignment[])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
     } finally {
@@ -198,32 +200,7 @@ export default function StatisticsPage() {
                 Noch keine Daten vorhanden
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: '#6b7280' }}
-                    axisLine={false}
-                    tickLine={false}
-                    allowDecimals={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius: '8px',
-                      border: '1px solid #e5e7eb',
-                      fontSize: '12px',
-                    }}
-                  />
-                  <Bar dataKey="Gesamt" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="Diesen Monat" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <StatisticsBarChart data={chartData} />
             )}
           </CardContent>
         </Card>
