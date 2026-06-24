@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db'
 import { Sidebar, BottomNav } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { PushNotificationPrompt } from '@/components/push-notification-prompt'
+import { BackgroundAnimation } from '@/components/layout/background-animation'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth()
@@ -26,7 +27,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
   }
 
   return (
-    <div className="fixed inset-0 flex overflow-hidden bg-surface" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="fixed inset-0 flex overflow-hidden bg-surface-muted" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Ambient background animation layer */}
+      <BackgroundAnimation />
+
       {/* Desktop sidebar */}
       <Sidebar
         userRole={role}
@@ -37,7 +41,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         wgAvatarUrl={wgAvatarUrl}
       />
 
-      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden" style={{ position: 'relative', zIndex: 1 }}>
         <Header
           userName={name}
           userEmail={email}
@@ -48,7 +52,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
         {/* Main content — extra bottom padding on mobile for the bottom nav */}
         {/* paddingBottom via CSS class so we can scope it to standalone PWA only */}
-        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 bg-surface-muted main-scroll-area">
+        <main className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 main-scroll-area">
           {children}
         </main>
       </div>
