@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser, sendPushToWG } from '@/lib/push'
+import { snapToWeekday } from '@/lib/duty-rotation'
 
 const patchAssignmentSchema = z.union([
   z.object({ action: z.enum(['complete', 'uncomplete']) }),
@@ -73,7 +74,14 @@ export async function PATCH(
       const { dutyId, userId, dueDate } = parsed.data
       if (dutyId) updateData.dutyId = dutyId
       if (userId) updateData.userId = userId
-      if (dueDate) updateData.dueDate = new Date(dueDate)
+      if (dueDate) {
+        let dueWeekday = existing.duty.dueWeekday
+        if (dutyId && dutyId !== existing.dutyId) {
+          const newDuty = await prisma.duty.findUnique({ where: { id: dutyId, wgId } })
+          dueWeekday = newDuty?.dueWeekday ?? null
+        }
+        updateData.dueDate = snapToWeekday(new Date(dueDate), dueWeekday)
+      }
     }
 
     const assignment = await prisma.dutyAssignment.update({

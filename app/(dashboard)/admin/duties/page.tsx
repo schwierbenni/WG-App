@@ -421,6 +421,11 @@ export default function AdminDutiesPage() {
                 onChange={(e) => setAssignDueDate(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
               />
+              {getWeekdayLabel(assignTarget?.dueWeekday) && (
+                <p className="text-xs text-gray-400">
+                  Dieser Dienst hat {getWeekdayLabel(assignTarget?.dueWeekday)} als Stichtag — das Datum wird ggf. automatisch darauf angepasst.
+                </p>
+              )}
             </div>
           </div>
           <ResponsiveModalFooter>
