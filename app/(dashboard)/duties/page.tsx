@@ -511,6 +511,11 @@ export default function DutiesPage() {
                 onChange={(e) => setAssignDueDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 10)}
               />
+              {getWeekdayLabel(assignDialog?.duty.dueWeekday) && (
+                <p className="text-xs text-gray-400">
+                  Dieser Dienst hat {getWeekdayLabel(assignDialog?.duty.dueWeekday)} als Stichtag — das Datum wird ggf. automatisch darauf angepasst.
+                </p>
+              )}
             </div>
 
             {assignError && (

@@ -3,6 +3,17 @@ import { logger } from '@/lib/logger'
 import { sendPushToUser, sendPushToWG } from '@/lib/push'
 import type { Duty } from '@prisma/client'
 
+// Snaps a date forward to the next occurrence of the given weekday
+// (0=So..6=Sa, matches Date#getDay). Leaves the date untouched if it's
+// already on that weekday, or if no weekday is configured.
+export function snapToWeekday(date: Date, weekday?: number | null): Date {
+  if (weekday === null || weekday === undefined) return date
+  const result = new Date(date)
+  const diff = (weekday - result.getDay() + 7) % 7
+  result.setDate(result.getDate() + diff)
+  return result
+}
+
 export function getNextDueDate(
   interval: string,
   from: Date = new Date(),
@@ -17,11 +28,10 @@ export function getNextDueDate(
     default: date.setDate(date.getDate() + 7); break
   }
 
-  // Snap to the configured weekday (0=So..6=Sa, matches Date#getDay) so
-  // weekly/biweekly duties always fall due on the same day, e.g. every Monday.
-  if ((interval === 'WEEKLY' || interval === 'BIWEEKLY') && weekday !== null && weekday !== undefined) {
-    const diff = (weekday - date.getDay() + 7) % 7
-    date.setDate(date.getDate() + diff)
+  // Weekly/biweekly duties always fall due on the configured weekday, e.g.
+  // every Monday, instead of drifting with whenever the rotation last ran.
+  if (interval === 'WEEKLY' || interval === 'BIWEEKLY') {
+    return snapToWeekday(date, weekday)
   }
 
   return date

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
+import { snapToWeekday } from '@/lib/duty-rotation'
 
 const createAssignmentSchema = z.object({
   dutyId: z.string().min(1, 'dutyId is required'),
@@ -69,15 +70,19 @@ export async function POST(request: Request) {
     const user = await prisma.user.findUnique({ where: { id: userId, wgId } })
     if (!user) return Response.json({ error: 'User not found' }, { status: 404 })
 
+    // Duties with a fixed Stichtag-Wochentag must always be due on that
+    // weekday, even when an admin manually picks the due date.
+    const snappedDueDate = snapToWeekday(new Date(dueDate), duty.dueWeekday)
+
     const assignment = await prisma.dutyAssignment.create({
-      data: { wgId, dutyId, userId, dueDate: new Date(dueDate) },
+      data: { wgId, dutyId, userId, dueDate: snappedDueDate },
       include: {
         duty: { select: { id: true, name: true, emoji: true, color: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
     })
 
-    const assignMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${new Date(dueDate).toLocaleDateString('de-DE')}`
+    const assignMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${snappedDueDate.toLocaleDateString('de-DE')}`
 
     await prisma.notification.create({
       data: { wgId, userId, type: 'ASSIGNMENT', message: assignMsg },
