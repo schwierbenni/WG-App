@@ -27,6 +27,7 @@ export const dutySchema = z.object({
   emoji: z.string().max(10).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Ungültige Farbe').optional().default('#6366f1'),
   rotationInterval: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'MANUAL']).default('WEEKLY'),
+  dueWeekday: z.number().int().min(0).max(6).nullable().optional(),
   rotationOrder: z.array(z.string()).default([]),
   checklistItems: z.array(z.string()).default([]),
 })

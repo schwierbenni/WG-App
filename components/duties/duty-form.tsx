@@ -21,6 +21,16 @@ const INTERVALS = [
   { value: 'MANUAL', label: 'Manuell' },
 ]
 
+const WEEKDAYS = [
+  { value: '1', label: 'Montag' },
+  { value: '2', label: 'Dienstag' },
+  { value: '3', label: 'Mittwoch' },
+  { value: '4', label: 'Donnerstag' },
+  { value: '5', label: 'Freitag' },
+  { value: '6', label: 'Samstag' },
+  { value: '0', label: 'Sonntag' },
+]
+
 const dutyFormSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich').max(100),
   description: z.string().max(500).optional(),
@@ -38,10 +48,10 @@ interface Member {
 }
 
 interface DutyFormProps {
-  initialValues?: Partial<DutyFormValues>
+  initialValues?: Partial<DutyFormValues> & { dueWeekday?: number | null }
   initialRotationOrder?: string[]
   members?: Member[]
-  onSubmit: (values: Omit<DutyFormValues, 'checklistItems'> & { checklistItems: string[]; rotationOrder: string[] }) => Promise<void>
+  onSubmit: (values: Omit<DutyFormValues, 'checklistItems'> & { checklistItems: string[]; rotationOrder: string[]; dueWeekday: number | null }) => Promise<void>
   onCancel?: () => void
   isLoading?: boolean
   submitLabel?: string
@@ -51,6 +61,11 @@ export function DutyForm({ initialValues, initialRotationOrder, members = [], on
   const [selectedEmoji, setSelectedEmoji] = useState(initialValues?.emoji ?? '')
   const [selectedColor, setSelectedColor] = useState(initialValues?.color ?? '#6366f1')
   const [rotationOrder, setRotationOrder] = useState<string[]>(initialRotationOrder ?? [])
+  const [dueWeekday, setDueWeekday] = useState<string>(
+    initialValues?.dueWeekday !== null && initialValues?.dueWeekday !== undefined ? String(initialValues.dueWeekday) : ''
+  )
+  const initialInterval = (initialValues?.rotationInterval as DutyFormValues['rotationInterval']) ?? 'WEEKLY'
+  const [rotationInterval, setRotationInterval] = useState<DutyFormValues['rotationInterval']>(initialInterval)
 
   const { register, handleSubmit, control, formState: { errors }, setValue } = useForm<DutyFormValues>({
     resolver: zodResolver(dutyFormSchema),
@@ -59,12 +74,14 @@ export function DutyForm({ initialValues, initialRotationOrder, members = [], on
       description: initialValues?.description ?? '',
       emoji: initialValues?.emoji ?? '',
       color: initialValues?.color ?? '#6366f1',
-      rotationInterval: (initialValues?.rotationInterval as DutyFormValues['rotationInterval']) ?? 'WEEKLY',
+      rotationInterval: initialInterval,
       checklistItems: initialValues?.checklistItems?.map((v) => ({ value: typeof v === 'string' ? v : '' })) ?? [],
     },
   })
 
   const { fields, append, remove } = useFieldArray({ control, name: 'checklistItems' })
+  const registerInterval = register('rotationInterval')
+  const showWeekdayPicker = rotationInterval === 'WEEKLY' || rotationInterval === 'BIWEEKLY'
 
   async function onFormSubmit(values: DutyFormValues) {
     await onSubmit({
@@ -73,6 +90,7 @@ export function DutyForm({ initialValues, initialRotationOrder, members = [], on
       color: selectedColor,
       checklistItems: values.checklistItems.map((i) => i.value).filter(Boolean),
       rotationOrder,
+      dueWeekday: showWeekdayPicker && dueWeekday !== '' ? Number(dueWeekday) : null,
     })
   }
 
@@ -169,7 +187,8 @@ export function DutyForm({ initialValues, initialRotationOrder, members = [], on
         <Label htmlFor="duty-interval">Rotationsintervall</Label>
         <select
           id="duty-interval"
-          {...register('rotationInterval')}
+          {...registerInterval}
+          onChange={(e) => { registerInterval.onChange(e); setRotationInterval(e.target.value as DutyFormValues['rotationInterval']) }}
           className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           {INTERVALS.map((i) => (
@@ -177,6 +196,26 @@ export function DutyForm({ initialValues, initialRotationOrder, members = [], on
           ))}
         </select>
       </div>
+
+      {showWeekdayPicker && (
+        <div className="space-y-2">
+          <Label htmlFor="duty-weekday">Stichtag (Wochentag)</Label>
+          <select
+            id="duty-weekday"
+            value={dueWeekday}
+            onChange={(e) => setDueWeekday(e.target.value)}
+            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            <option value="">Kein fester Wochentag</option>
+            {WEEKDAYS.map((w) => (
+              <option key={w.value} value={w.value}>{w.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400">
+            Der Dienst ist bis zu diesem Wochentag erledigt zu markieren. Danach springt die Rotation automatisch zur nächsten Person.
+          </p>
+        </div>
+      )}
 
       {members.length > 0 && (
         <div className="space-y-3">

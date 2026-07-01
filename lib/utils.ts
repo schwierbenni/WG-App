@@ -35,6 +35,13 @@ export function getIntervalLabel(interval: string): string {
   }
 }
 
+const WEEKDAY_LABELS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag']
+
+export function getWeekdayLabel(weekday: number | null | undefined): string | null {
+  if (weekday === null || weekday === undefined) return null
+  return WEEKDAY_LABELS[weekday] ?? null
+}
+
 export function formatCurrency(amount: number, currency = 'EUR'): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amount)
 }

@@ -79,6 +79,7 @@ model Duty {
   emoji            String?
   color            String           @default("#6366f1")
   rotationInterval RotationInterval @default(WEEKLY)
+  dueWeekday       Int?
   isActive         Boolean          @default(true)
   isPaused         Boolean          @default(false)
   rotationOrder    String[]
@@ -122,14 +123,15 @@ enum RotationInterval {
 }
 
 model DutyAssignment {
-  id          String    @id @default(cuid())
-  wgId        String
-  dutyId      String
-  userId      String
-  dueDate     DateTime
-  completedAt DateTime?
-  completedBy String?
-  createdAt   DateTime  @default(now())
+  id                String    @id @default(cuid())
+  wgId              String
+  dutyId            String
+  userId            String
+  dueDate           DateTime
+  completedAt       DateTime?
+  completedBy       String?
+  overdueNotifiedAt DateTime?
+  createdAt         DateTime  @default(now())
 
   wg           WGConfig      @relation(fields: [wgId], references: [id], onDelete: Cascade)
   duty         Duty          @relation(fields: [dutyId], references: [id], onDelete: Cascade)
