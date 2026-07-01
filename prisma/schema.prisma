@@ -79,6 +79,7 @@ model Duty {
   emoji            String?
   color            String           @default("#6366f1")
   rotationInterval RotationInterval @default(WEEKLY)
+  dueWeekday       Int?
   isActive         Boolean          @default(true)
   isPaused         Boolean          @default(false)
   rotationOrder    String[]

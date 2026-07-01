@@ -1,0 +1,1 @@
+ALTER TABLE "Duty" ADD COLUMN "dueWeekday" INTEGER;

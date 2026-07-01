@@ -25,7 +25,7 @@ import { Select } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { SwapDialog } from '@/components/duties/swap-dialog'
 import { SwapResponseModal } from '@/components/duties/swap-response-modal'
-import { cn, formatDate, getInitials, getIntervalLabel } from '@/lib/utils'
+import { cn, formatDate, getInitials, getIntervalLabel, getWeekdayLabel } from '@/lib/utils'
 
 function SwapDeepLink({ onSuccess }: { onSuccess: () => void }) {
   const searchParams = useSearchParams()
@@ -67,6 +67,7 @@ interface DutyWithAssignment {
   emoji: string | null
   color: string
   rotationInterval: string
+  dueWeekday: number | null
   isPaused: boolean
   assignments: Assignment[]
 }
@@ -366,6 +367,11 @@ export default function DutiesPage() {
                       <RefreshCw className="h-3 w-3 mr-1" />
                       {getIntervalLabel(duty.rotationInterval)}
                     </Badge>
+                    {getWeekdayLabel(duty.dueWeekday) && (
+                      <Badge variant="outline" className="text-xs font-normal">
+                        Stichtag: {getWeekdayLabel(duty.dueWeekday)}
+                      </Badge>
+                    )}
                   </div>
 
                   {assignment ? (

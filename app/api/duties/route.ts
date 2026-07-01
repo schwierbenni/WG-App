@@ -1,6 +1,8 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { logger } from '@/lib/logger'
+import { rotateDueDuties } from '@/lib/duty-rotation'
 
 const createDutySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -8,6 +10,7 @@ const createDutySchema = z.object({
   emoji: z.string().optional(),
   color: z.string().optional(),
   rotationInterval: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'MANUAL']).optional(),
+  dueWeekday: z.number().int().min(0).max(6).nullable().optional(),
   checklistItems: z.array(z.string()).optional(),
   rotationOrder: z.array(z.string()).optional(),
 })
@@ -18,6 +21,16 @@ export async function GET() {
   const { wgId } = auth
 
   try {
+    // Self-healing rotation: whenever the duty board is opened, any duty past
+    // its Stichtag (due date) is rotated to the next person automatically.
+    // This does not depend on the external Vercel Cron actually being wired
+    // up, so rotation reliably happens without a manual admin action.
+    try {
+      await rotateDueDuties({ wgId })
+    } catch (error) {
+      logger.error('Automatische Dienstrotation (on-read) fehlgeschlagen', { wgId, error: String(error) })
+    }
+
     const duties = await prisma.duty.findMany({
       where: { wgId, isActive: true },
       include: {
@@ -65,6 +78,7 @@ export async function POST(request: Request) {
         emoji: parsed.data.emoji,
         color: parsed.data.color ?? '#6366f1',
         rotationInterval: parsed.data.rotationInterval ?? 'WEEKLY',
+        dueWeekday: parsed.data.dueWeekday ?? null,
         checklistItems: parsed.data.checklistItems ?? [],
         rotationOrder: parsed.data.rotationOrder ?? [],
       },

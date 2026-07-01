@@ -8,6 +8,7 @@ const updateDutySchema = z.object({
   emoji: z.string().optional(),
   color: z.string().optional(),
   rotationInterval: z.enum(['DAILY', 'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'MANUAL']).optional(),
+  dueWeekday: z.number().int().min(0).max(6).nullable().optional(),
   isActive: z.boolean().optional(),
   isPaused: z.boolean().optional(),
   checklistItems: z.array(z.string()).optional(),

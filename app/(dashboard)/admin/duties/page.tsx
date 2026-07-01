@@ -18,7 +18,7 @@ import {
   ResponsiveModalFooter,
 } from '@/components/ui/responsive-modal'
 import { DutyForm } from '@/components/duties/duty-form'
-import { getIntervalLabel } from '@/lib/utils'
+import { getIntervalLabel, getWeekdayLabel } from '@/lib/utils'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,7 @@ interface Duty {
   emoji?: string | null
   color: string
   rotationInterval: string
+  dueWeekday: number | null
   isActive: boolean
   isPaused: boolean
   checklistItems: string[]
@@ -258,6 +259,9 @@ export default function AdminDutiesPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-gray-900 dark:text-gray-100">{duty.name}</h3>
                         <Badge variant="secondary" className="text-xs">{getIntervalLabel(duty.rotationInterval)}</Badge>
+                        {getWeekdayLabel(duty.dueWeekday) && (
+                          <Badge variant="outline" className="text-xs">Stichtag: {getWeekdayLabel(duty.dueWeekday)}</Badge>
+                        )}
                         {duty.isPaused && <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">Pausiert</Badge>}
                       </div>
                       {duty.description && (
@@ -357,6 +361,7 @@ export default function AdminDutiesPage() {
                 emoji: editDuty.emoji ?? '',
                 color: editDuty.color,
                 rotationInterval: editDuty.rotationInterval as 'DAILY' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'MANUAL',
+                dueWeekday: editDuty.dueWeekday,
                 checklistItems: editDuty.checklistItems.map((v) => ({ value: v })),
               }}
               onSubmit={handleEdit as Parameters<typeof DutyForm>[0]['onSubmit']}

@@ -2,22 +2,11 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
+import { getNextDueDate } from '@/lib/duty-rotation'
 
 const rotateSchema = z.object({
   dutyId: z.string().min(1, 'dutyId is required'),
 })
-
-function getNextDueDate(interval: string, from: Date = new Date()): Date {
-  const date = new Date(from)
-  switch (interval) {
-    case 'DAILY': date.setDate(date.getDate() + 1); break
-    case 'WEEKLY': date.setDate(date.getDate() + 7); break
-    case 'BIWEEKLY': date.setDate(date.getDate() + 14); break
-    case 'MONTHLY': date.setMonth(date.getMonth() + 1); break
-    default: date.setDate(date.getDate() + 7); break
-  }
-  return date
-}
 
 export async function POST(request: Request) {
   const auth = await requireWgSession()
@@ -60,7 +49,7 @@ export async function POST(request: Request) {
     const nextUser = await prisma.user.findUnique({ where: { id: nextUserId, wgId } })
     if (!nextUser) return Response.json({ error: 'Next user in rotation not found' }, { status: 404 })
 
-    const dueDate = getNextDueDate(duty.rotationInterval)
+    const dueDate = getNextDueDate(duty.rotationInterval, new Date(), duty.dueWeekday)
 
     const assignment = await prisma.dutyAssignment.create({
       data: { wgId, dutyId, userId: nextUserId, dueDate },
