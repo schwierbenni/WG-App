@@ -67,7 +67,7 @@ export async function PATCH(
       if (parsed.data.action === 'complete') {
         updateData = { completedAt: new Date(), completedBy: session.user.id }
       } else {
-        updateData = { completedAt: null, completedBy: null }
+        updateData = { completedAt: null, completedBy: null, overdueNotifiedAt: null }
       }
     } else {
       const { dutyId, userId, dueDate } = parsed.data

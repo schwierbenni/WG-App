@@ -58,18 +58,28 @@ async function rotateDutyIfDue(duty: Duty): Promise<RotationOutcome> {
     const dueDate = new Date(lastAssignment.dueDate)
     if (dueDate > new Date()) return noop
 
-    let overdueNotified = false
+    // The Stichtag has passed. Rotation only advances once the duty has
+    // actually been marked erledigt — an overdue-but-uncompleted duty just
+    // gets a (one-time) reminder and keeps waiting for completion.
     if (!lastAssignment.completedAt) {
-      const overdueMsg = `Der Dienst „${duty.name}" wurde nicht rechtzeitig erledigt.`
-      const wgMembers = await tx.user.findMany({ where: { wgId: duty.wgId } })
-      await Promise.all(
-        wgMembers.map((m) =>
-          tx.notification.create({
-            data: { wgId: duty.wgId, userId: m.id, type: 'REMINDER', message: overdueMsg },
-          })
+      let overdueNotified = false
+      if (!lastAssignment.overdueNotifiedAt) {
+        const overdueMsg = `Der Dienst „${duty.name}" wurde nicht rechtzeitig erledigt.`
+        const wgMembers = await tx.user.findMany({ where: { wgId: duty.wgId } })
+        await Promise.all(
+          wgMembers.map((m) =>
+            tx.notification.create({
+              data: { wgId: duty.wgId, userId: m.id, type: 'REMINDER', message: overdueMsg },
+            })
+          )
         )
-      )
-      overdueNotified = true
+        await tx.dutyAssignment.update({
+          where: { id: lastAssignment.id },
+          data: { overdueNotifiedAt: new Date() },
+        })
+        overdueNotified = true
+      }
+      return { ...noop, overdueNotified }
     }
 
     const currentIndex = duty.rotationOrder.indexOf(lastAssignment.userId)
@@ -77,7 +87,7 @@ async function rotateDutyIfDue(duty: Duty): Promise<RotationOutcome> {
     const scheduledUserId = duty.rotationOrder[nextIndex]
 
     const scheduledUser = await tx.user.findUnique({ where: { id: scheduledUserId, wgId: duty.wgId } })
-    if (!scheduledUser) return { ...noop, overdueNotified }
+    if (!scheduledUser) return noop
 
     // Check for an open IOU where the scheduled user is the creditor.
     // If found, the debitor steps in instead (pays back the duty swap).
@@ -105,13 +115,15 @@ async function rotateDutyIfDue(duty: Duty): Promise<RotationOutcome> {
       data: { wgId: duty.wgId, userId: assignedUserId, type: 'ASSIGNMENT', message: msg },
     })
 
-    return { rotated: true, overdueNotified, wgId: duty.wgId, dutyName: duty.name, assignedUserId, nextDueDate }
+    return { rotated: true, overdueNotified: false, wgId: duty.wgId, dutyName: duty.name, assignedUserId, nextDueDate }
   })
 }
 
 /**
- * Rotates every active, non-paused duty whose current assignment's due date
- * (Stichtag) has passed. Scope to a single WG via `where.wgId`, or omit it to
+ * Rotates every active, non-paused duty whose current assignment is past its
+ * due date (Stichtag) *and* has been marked erledigt. Overdue-but-uncompleted
+ * duties get a one-time reminder instead and keep waiting for completion.
+ * Scope to a single WG via `where.wgId`, or omit it to
  * sweep all WGs (used by the daily cron).
  */
 export async function rotateDueDuties(where: { wgId?: string } = {}): Promise<{ rotated: number; errors: string[] }> {
