@@ -102,22 +102,12 @@ async function main() {
     }
   }
 
-  const now = new Date()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - now.getDay() + 1)
-  startOfWeek.setHours(0, 0, 0, 0)
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6)
-  endOfWeek.setHours(23, 59, 59, 999)
-
   for (let i = 0; i < createdDuties.length; i++) {
     const duty = createdDuties[i]
     const userId = userIds[i % userIds.length]
-    const existing = await prisma.dutyAssignment.findFirst({
-      where: { dutyId: duty.id, dueDate: { gte: startOfWeek, lte: endOfWeek } },
-    })
+    const existing = await prisma.dutyAssignment.findFirst({ where: { dutyId: duty.id } })
     if (!existing) {
-      await prisma.dutyAssignment.create({ data: { wgId: wgConfig.id, dutyId: duty.id, userId, dueDate: endOfWeek } })
+      await prisma.dutyAssignment.create({ data: { wgId: wgConfig.id, dutyId: duty.id, userId } })
       const user = createdUsers.find((u) => u.id === userId)
       console.log(`✅ Zuweisung: ${duty.name} → ${user?.name}`)
     }

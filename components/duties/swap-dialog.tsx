@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/responsive-modal'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { getInitials, formatDate } from '@/lib/utils'
+import { getInitials, getDueLabel } from '@/lib/utils'
 
 interface SimpleUser {
   id: string
@@ -31,7 +31,7 @@ interface SwapRequestItem {
   assignment: {
     id: string
     dueDate: string
-    duty: { id: string; name: string; emoji?: string | null; color: string }
+    duty: { id: string; name: string; emoji?: string | null; color: string; dueWeekday?: number | null }
   }
 }
 
@@ -40,12 +40,13 @@ interface SwapDialogProps {
   dutyName: string
   dutyEmoji?: string | null
   dueDate: string
+  dueWeekday?: number | null
   members: SimpleUser[]
   trigger?: React.ReactNode
   onSuccess?: () => void
 }
 
-export function SwapDialog({ assignmentId, dutyName, dutyEmoji, dueDate, members, trigger, onSuccess }: SwapDialogProps) {
+export function SwapDialog({ assignmentId, dutyName, dutyEmoji, dueDate, dueWeekday, members, trigger, onSuccess }: SwapDialogProps) {
   const { data: session } = useSession()
   const [open, setOpen] = React.useState(false)
   const [selectedUserId, setSelectedUserId] = React.useState('')
@@ -135,7 +136,7 @@ export function SwapDialog({ assignmentId, dutyName, dutyEmoji, dueDate, members
             <p className="font-medium text-gray-900">
               {dutyEmoji && <span className="mr-1">{dutyEmoji}</span>}{dutyName}
             </p>
-            <p className="text-sm text-gray-500">Fällig: {formatDate(dueDate)}</p>
+            <p className="text-sm text-gray-500">Fällig: {getDueLabel(dueDate, dueWeekday)}</p>
           </div>
 
           {success ? (
@@ -190,7 +191,7 @@ export function SwapDialog({ assignmentId, dutyName, dutyEmoji, dueDate, members
                           {req.assignment.duty.name}
                         </span>{' '}tauschen
                       </p>
-                      <p className="text-xs text-gray-400">Fällig: {formatDate(req.assignment.dueDate)}</p>
+                      <p className="text-xs text-gray-400">Fällig: {getDueLabel(req.assignment.dueDate, req.assignment.duty.dueWeekday)}</p>
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <Button size="icon" variant="ghost" className="h-10 w-10 text-green-600 hover:bg-green-50" disabled={actionLoading === req.id + 'accept'} onClick={() => handleAction(req.id, 'accept')} title="Annehmen">

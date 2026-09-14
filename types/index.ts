@@ -20,9 +20,14 @@ export interface Duty {
 }
 
 export interface DutyAssignment {
-  id: string; dutyId: string; userId: string; dueDate: Date
+  id: string; dutyId: string; userId: string
   completedAt: Date | null; completedBy: string | null; createdAt: Date
 }
+
+// dueDate isn't a persisted column — it's derived from createdAt plus the
+// duty's rotationInterval/dueWeekday (see lib/duty-rotation.ts) and attached
+// to API responses for display.
+export type DutyAssignmentWithDueDate = DutyAssignment & { dueDate: Date }
 
 export interface SwapRequest {
   id: string; fromUserId: string; toUserId: string; assignmentId: string

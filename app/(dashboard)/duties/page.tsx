@@ -22,10 +22,9 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { SwapDialog } from '@/components/duties/swap-dialog'
 import { SwapResponseModal } from '@/components/duties/swap-response-modal'
-import { cn, formatDate, getInitials, getIntervalLabel, getWeekdayLabel } from '@/lib/utils'
+import { cn, getDueLabel, getInitials, getIntervalLabel, getWeekdayLabel } from '@/lib/utils'
 
 function SwapDeepLink({ onSuccess }: { onSuccess: () => void }) {
   const searchParams = useSearchParams()
@@ -126,7 +125,6 @@ export default function DutiesPage() {
   const [completing, setCompleting] = React.useState<string | null>(null)
   const [assignDialog, setAssignDialog] = React.useState<AssignDialogState | null>(null)
   const [assignUserId, setAssignUserId] = React.useState('')
-  const [assignDueDate, setAssignDueDate] = React.useState('')
   const [assigning, setAssigning] = React.useState(false)
   const [assignError, setAssignError] = React.useState('')
   const [pendingOut, setPendingOut] = React.useState<PendingOutSwap[]>([])
@@ -195,16 +193,13 @@ export default function DutiesPage() {
   }
 
   function openAssignDialog(duty: DutyWithAssignment) {
-    const defaultDate = new Date()
-    defaultDate.setDate(defaultDate.getDate() + 7)
     setAssignUserId('')
-    setAssignDueDate(defaultDate.toISOString().slice(0, 10))
     setAssignError('')
     setAssignDialog({ duty })
   }
 
   async function handleAssign() {
-    if (!assignDialog || !assignUserId || !assignDueDate) return
+    if (!assignDialog || !assignUserId) return
     setAssigning(true)
     setAssignError('')
     try {
@@ -214,7 +209,6 @@ export default function DutiesPage() {
         body: JSON.stringify({
           dutyId: assignDialog.duty.id,
           userId: assignUserId,
-          dueDate: new Date(assignDueDate).toISOString(),
         }),
       })
       if (res.ok) {
@@ -393,7 +387,7 @@ export default function DutiesPage() {
                             )}
                           </p>
                           <p className="text-xs text-gray-400">
-                            Fällig: {formatDate(assignment.dueDate)}
+                            Fällig: {getDueLabel(assignment.dueDate, duty.dueWeekday)}
                           </p>
                         </div>
                       </div>
@@ -415,6 +409,7 @@ export default function DutiesPage() {
                             dutyName={duty.name}
                             dutyEmoji={duty.emoji}
                             dueDate={assignment.dueDate}
+                            dueWeekday={duty.dueWeekday}
                             members={members}
                             onSuccess={fetchData}
                           />
@@ -502,21 +497,11 @@ export default function DutiesPage() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="assign-date">Fälligkeitsdatum</Label>
-              <Input
-                id="assign-date"
-                type="date"
-                value={assignDueDate}
-                onChange={(e) => setAssignDueDate(e.target.value)}
-                min={new Date().toISOString().slice(0, 10)}
-              />
-              {getWeekdayLabel(assignDialog?.duty.dueWeekday) && (
-                <p className="text-xs text-gray-400">
-                  Dieser Dienst hat {getWeekdayLabel(assignDialog?.duty.dueWeekday)} als Stichtag — das Datum wird ggf. automatisch darauf angepasst.
-                </p>
-              )}
-            </div>
+            {getWeekdayLabel(assignDialog?.duty.dueWeekday) && (
+              <p className="text-xs text-gray-400">
+                Dieser Dienst ist {getWeekdayLabel(assignDialog?.duty.dueWeekday)} fällig — das Fälligkeitsdatum wird automatisch danach berechnet.
+              </p>
+            )}
 
             {assignError && (
               <p className="text-sm text-red-600">{assignError}</p>
@@ -527,7 +512,7 @@ export default function DutiesPage() {
             <Button variant="outline" onClick={() => setAssignDialog(null)}>Abbrechen</Button>
             <Button
               onClick={handleAssign}
-              disabled={assigning || !assignUserId || !assignDueDate}
+              disabled={assigning || !assignUserId}
             >
               {assigning ? 'Zuweisen…' : 'Zuweisen'}
             </Button>

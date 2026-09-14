@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
+import { getAssignmentDueDate } from '@/lib/duty-rotation'
 
 const createSwapSchema = z.object({
   toUserId: z.string().min(1, 'toUserId is required'),
@@ -28,12 +29,17 @@ export async function GET(request: Request) {
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
-        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true } } } },
+        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true, rotationInterval: true, dueWeekday: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     })
 
-    return Response.json({ swapRequests })
+    const withDates = swapRequests.map((r) => ({
+      ...r,
+      assignment: { ...r.assignment, dueDate: getAssignmentDueDate(r.assignment.duty, r.assignment) },
+    }))
+
+    return Response.json({ swapRequests: withDates })
   } catch (error) {
     console.error('GET swap-requests error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
-        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true } } } },
+        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true, rotationInterval: true, dueWeekday: true } } } },
       },
     })
 
@@ -87,7 +93,12 @@ export async function POST(request: Request) {
 
     sendPushToUser(toUserId, { title: 'Tausch-Anfrage', body: swapMessage, url: `/duties?swap=${swapRequest.id}` }).catch(() => {})
 
-    return Response.json({ swapRequest }, { status: 201 })
+    return Response.json({
+      swapRequest: {
+        ...swapRequest,
+        assignment: { ...swapRequest.assignment, dueDate: getAssignmentDueDate(swapRequest.assignment.duty, swapRequest.assignment) },
+      },
+    }, { status: 201 })
   } catch (error) {
     console.error('POST swap-requests error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

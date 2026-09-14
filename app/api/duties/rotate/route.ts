@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
-import { getNextDueDate } from '@/lib/duty-rotation'
+import { getAssignmentDueDate } from '@/lib/duty-rotation'
 
 const rotateSchema = z.object({
   dutyId: z.string().min(1, 'dutyId is required'),
@@ -49,15 +49,14 @@ export async function POST(request: Request) {
     const nextUser = await prisma.user.findUnique({ where: { id: nextUserId, wgId } })
     if (!nextUser) return Response.json({ error: 'Next user in rotation not found' }, { status: 404 })
 
-    const dueDate = getNextDueDate(duty.rotationInterval, new Date(), duty.dueWeekday)
-
     const assignment = await prisma.dutyAssignment.create({
-      data: { wgId, dutyId, userId: nextUserId, dueDate },
+      data: { wgId, dutyId, userId: nextUserId },
       include: {
         duty: true,
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
     })
+    const dueDate = getAssignmentDueDate(duty, assignment)
 
     const rotateMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${dueDate.toLocaleDateString('de-DE')}`
 
@@ -67,7 +66,7 @@ export async function POST(request: Request) {
 
     sendPushToUser(nextUserId, { title: 'Neue Zuteilung', body: rotateMsg, url: '/duties' }).catch(() => {})
 
-    return Response.json({ assignment }, { status: 201 })
+    return Response.json({ assignment: { ...assignment, dueDate } }, { status: 201 })
   } catch (error) {
     console.error('POST rotate error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

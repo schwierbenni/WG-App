@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
-import { rotateDueDuties } from '@/lib/duty-rotation'
+import { rotateDueDuties, getAssignmentDueDate } from '@/lib/duty-rotation'
 
 const createDutySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -37,7 +37,7 @@ export async function GET() {
         assignments: {
           orderBy: [
             { completedAt: { sort: 'desc', nulls: 'first' } },
-            { dueDate: 'desc' },
+            { createdAt: 'desc' },
           ],
           take: 1,
           include: {
@@ -48,7 +48,12 @@ export async function GET() {
       orderBy: { name: 'asc' },
     })
 
-    return Response.json({ duties })
+    const dutiesWithDueDates = duties.map((duty) => ({
+      ...duty,
+      assignments: duty.assignments.map((a) => ({ ...a, dueDate: getAssignmentDueDate(duty, a) })),
+    }))
+
+    return Response.json({ duties: dutiesWithDueDates })
   } catch (error) {
     console.error('GET duties error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

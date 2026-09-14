@@ -37,6 +37,26 @@ export function getNextDueDate(
   return date
 }
 
+// DutyAssignment no longer persists a dueDate column. It is derived here from
+// when the assignment was created plus the duty's rotation cadence, so there
+// is a single source of truth (duty.rotationInterval + duty.dueWeekday)
+// instead of a stored value that can drift out of sync with it.
+export function getAssignmentDueDate(
+  duty: Pick<Duty, 'rotationInterval' | 'dueWeekday'>,
+  assignment: { createdAt: Date }
+): Date {
+  return getNextDueDate(duty.rotationInterval, assignment.createdAt, duty.dueWeekday)
+}
+
+// Attaches the derived dueDate to an assignment (with its duty included) for
+// API responses, so clients keep receiving a `dueDate` field without it
+// being a persisted column.
+export function withDueDate<
+  T extends { createdAt: Date; duty: Pick<Duty, 'rotationInterval' | 'dueWeekday'> }
+>(assignment: T): T & { dueDate: Date } {
+  return { ...assignment, dueDate: getAssignmentDueDate(assignment.duty, assignment) }
+}
+
 interface RotationOutcome {
   rotated: boolean
   overdueNotified: boolean
@@ -65,7 +85,7 @@ async function rotateDutyIfDue(duty: Duty): Promise<RotationOutcome> {
 
     if (!lastAssignment) return noop
 
-    const dueDate = new Date(lastAssignment.dueDate)
+    const dueDate = getAssignmentDueDate(duty, lastAssignment)
     if (dueDate > new Date()) return noop
 
     // The Stichtag has passed. Rotation only advances once the duty has
@@ -107,11 +127,11 @@ async function rotateDutyIfDue(duty: Duty): Promise<RotationOutcome> {
     })
 
     const assignedUserId = pendingIOU ? pendingIOU.debitorId : scheduledUserId
-    const nextDueDate = getNextDueDate(duty.rotationInterval, new Date(), duty.dueWeekday)
 
-    await tx.dutyAssignment.create({
-      data: { wgId: duty.wgId, dutyId: duty.id, userId: assignedUserId, dueDate: nextDueDate },
+    const newAssignment = await tx.dutyAssignment.create({
+      data: { wgId: duty.wgId, dutyId: duty.id, userId: assignedUserId },
     })
+    const nextDueDate = getAssignmentDueDate(duty, newAssignment)
 
     if (pendingIOU) {
       await tx.dutySwapIOU.update({

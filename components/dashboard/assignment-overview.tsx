@@ -1,6 +1,6 @@
 'use client'
 
-import { formatDate, getInitials, cn } from '@/lib/utils'
+import { getDueLabel, getInitials, cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { CheckCircle2, Clock, AlertCircle } from 'lucide-react'
@@ -16,7 +16,7 @@ interface OverviewAssignment {
   id: string
   dueDate: string
   completedAt: string | null
-  duty: { id: string; name: string; emoji: string | null; color: string }
+  duty: { id: string; name: string; emoji: string | null; color: string; dueWeekday?: number | null }
   user: SimpleUser
 }
 
@@ -101,7 +101,7 @@ export function AssignmentOverview({ assignments }: { assignments: OverviewAssig
                       <span className="text-[var(--text-muted)]">{assignment.user.name}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-[var(--text-muted)]">{formatDate(assignment.dueDate)}</td>
+                  <td className="px-4 py-3 text-[var(--text-muted)]">{getDueLabel(assignment.dueDate, assignment.duty.dueWeekday)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1.5">
                       <Icon className={cn('h-3.5 w-3.5 shrink-0', iconClass)} />
@@ -144,7 +144,7 @@ export function AssignmentOverview({ assignments }: { assignments: OverviewAssig
                     </AvatarFallback>
                   </Avatar>
                   <p className="text-xs text-[var(--text-muted)] truncate">
-                    {assignment.user.name} · {formatDate(assignment.dueDate)}
+                    {assignment.user.name} · {getDueLabel(assignment.dueDate, assignment.duty.dueWeekday)}
                   </p>
                 </div>
               </div>

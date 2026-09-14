@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   ResponsiveModalRoot,
@@ -57,7 +56,6 @@ export default function AdminDutiesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Duty | null>(null)
   const [assignTarget, setAssignTarget] = useState<Duty | null>(null)
   const [assignUserId, setAssignUserId] = useState('')
-  const [assignDueDate, setAssignDueDate] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -179,7 +177,7 @@ export default function AdminDutiesPage() {
   }
 
   async function handleAssign() {
-    if (!assignTarget || !assignUserId || !assignDueDate) return
+    if (!assignTarget || !assignUserId) return
     setActionLoading(true)
     try {
       const res = await fetch('/api/assignments', {
@@ -188,7 +186,6 @@ export default function AdminDutiesPage() {
         body: JSON.stringify({
           dutyId: assignTarget.id,
           userId: assignUserId,
-          dueDate: new Date(assignDueDate).toISOString(),
         }),
       })
       if (!res.ok) {
@@ -197,7 +194,6 @@ export default function AdminDutiesPage() {
       } else {
         setAssignTarget(null)
         setAssignUserId('')
-        setAssignDueDate('')
         setMessage({ type: 'success', text: `Dienst "${assignTarget.name}" erfolgreich zugewiesen!` })
         fetchAll()
       }
@@ -280,7 +276,7 @@ export default function AdminDutiesPage() {
 
                   {/* Desktop: inline buttons | Mobile: dropdown menu */}
                   <div className="hidden sm:flex items-center gap-1 shrink-0">
-                    <Button size="sm" variant="ghost" onClick={() => { setAssignTarget(duty); setAssignUserId(''); setAssignDueDate('') }} title="Manuell zuweisen" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                    <Button size="sm" variant="ghost" onClick={() => { setAssignTarget(duty); setAssignUserId('') }} title="Manuell zuweisen" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                       <UserPlus className="h-4 w-4" />
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => handleRotate(duty)} title="Rotation" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50">
@@ -305,7 +301,7 @@ export default function AdminDutiesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { setAssignTarget(duty); setAssignUserId(''); setAssignDueDate('') }}>
+                        <DropdownMenuItem onClick={() => { setAssignTarget(duty); setAssignUserId('') }}>
                           <UserPlus className="h-4 w-4 mr-2" /> Zuweisen
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleRotate(duty)}>
@@ -412,27 +408,17 @@ export default function AdminDutiesPage() {
                 ))}
               </select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="assign-date">Fälligkeitsdatum</Label>
-              <Input
-                id="assign-date"
-                type="date"
-                value={assignDueDate}
-                onChange={(e) => setAssignDueDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
-              />
-              {getWeekdayLabel(assignTarget?.dueWeekday) && (
-                <p className="text-xs text-gray-400">
-                  Dieser Dienst hat {getWeekdayLabel(assignTarget?.dueWeekday)} als Stichtag — das Datum wird ggf. automatisch darauf angepasst.
-                </p>
-              )}
-            </div>
+            {getWeekdayLabel(assignTarget?.dueWeekday) && (
+              <p className="text-xs text-gray-400">
+                Dieser Dienst ist {getWeekdayLabel(assignTarget?.dueWeekday)} fällig — das Fälligkeitsdatum wird automatisch danach berechnet.
+              </p>
+            )}
           </div>
           <ResponsiveModalFooter>
             <Button variant="outline" onClick={() => setAssignTarget(null)} className="min-h-[44px]">Abbrechen</Button>
             <Button
               onClick={handleAssign}
-              disabled={actionLoading || !assignUserId || !assignDueDate}
+              disabled={actionLoading || !assignUserId}
               className="min-h-[44px]"
             >
               {actionLoading ? 'Weise zu…' : 'Zuweisen'}

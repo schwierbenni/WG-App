@@ -5,7 +5,7 @@ import { CheckCircle2, ArrowLeftRight, Clock, AlertCircle, CheckSquare, Square }
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SwapDialog } from '@/components/duties/swap-dialog'
-import { cn, formatDate } from '@/lib/utils'
+import { cn, formatDate, getDueLabel } from '@/lib/utils'
 
 interface SimpleUser {
   id: string
@@ -24,6 +24,7 @@ interface DutyCardAssignment {
     emoji: string | null
     color: string
     checklistItems: string[]
+    dueWeekday?: number | null
   }
   user: SimpleUser
 }
@@ -135,7 +136,7 @@ export function DutyCard({ assignment, members = [], onUpdate }: DutyCardProps) 
             <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {currentStatus === 'done' && completedAt
                 ? `Erledigt am ${formatDate(completedAt)}`
-                : `Fällig: ${formatDate(assignment.dueDate)}`}
+                : `Fällig: ${getDueLabel(assignment.dueDate, assignment.duty.dueWeekday)}`}
             </p>
           </div>
         </div>
@@ -209,6 +210,7 @@ export function DutyCard({ assignment, members = [], onUpdate }: DutyCardProps) 
               dutyName={assignment.duty.name}
               dutyEmoji={assignment.duty.emoji}
               dueDate={assignment.dueDate}
+              dueWeekday={assignment.duty.dueWeekday}
               members={members}
               onSuccess={onUpdate}
               trigger={

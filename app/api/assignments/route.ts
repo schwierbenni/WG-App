@@ -2,12 +2,11 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
-import { snapToWeekday } from '@/lib/duty-rotation'
+import { getAssignmentDueDate, withDueDate } from '@/lib/duty-rotation'
 
 const createAssignmentSchema = z.object({
   dutyId: z.string().min(1, 'dutyId is required'),
   userId: z.string().min(1, 'userId is required'),
-  dueDate: z.string().datetime({ message: 'Invalid date format' }),
 })
 
 export async function GET(request: Request) {
@@ -26,21 +25,25 @@ export async function GET(request: Request) {
     if (userId) where.userId = userId
     if (dutyId) where.dutyId = dutyId
     if (upcoming) {
-      where.dueDate = { gt: new Date() }
       where.completedAt = null
     }
     if (completed) {
       where.completedAt = { not: null }
     }
 
-    const assignments = await prisma.dutyAssignment.findMany({
+    const rows = await prisma.dutyAssignment.findMany({
       where,
       include: {
-        duty: { select: { id: true, name: true, emoji: true, color: true, description: true } },
+        duty: { select: { id: true, name: true, emoji: true, color: true, description: true, rotationInterval: true, dueWeekday: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
-      orderBy: { dueDate: 'asc' },
     })
+
+    // dueDate is derived, not a DB column, so upcoming-filtering and
+    // due-date sorting both happen here in memory.
+    let assignments = rows.map(withDueDate)
+    if (upcoming) assignments = assignments.filter((a) => a.dueDate > new Date())
+    assignments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
 
     return Response.json({ assignments })
   } catch (error) {
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Validation failed', details: parsed.error.flatten() }, { status: 400 })
     }
 
-    const { dutyId, userId, dueDate } = parsed.data
+    const { dutyId, userId } = parsed.data
 
     const duty = await prisma.duty.findUnique({ where: { id: dutyId, wgId } })
     if (!duty) return Response.json({ error: 'Duty not found' }, { status: 404 })
@@ -70,19 +73,16 @@ export async function POST(request: Request) {
     const user = await prisma.user.findUnique({ where: { id: userId, wgId } })
     if (!user) return Response.json({ error: 'User not found' }, { status: 404 })
 
-    // Duties with a fixed Stichtag-Wochentag must always be due on that
-    // weekday, even when an admin manually picks the due date.
-    const snappedDueDate = snapToWeekday(new Date(dueDate), duty.dueWeekday)
-
     const assignment = await prisma.dutyAssignment.create({
-      data: { wgId, dutyId, userId, dueDate: snappedDueDate },
+      data: { wgId, dutyId, userId },
       include: {
-        duty: { select: { id: true, name: true, emoji: true, color: true } },
+        duty: { select: { id: true, name: true, emoji: true, color: true, rotationInterval: true, dueWeekday: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
     })
+    const dueDate = getAssignmentDueDate(duty, assignment)
 
-    const assignMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${snappedDueDate.toLocaleDateString('de-DE')}`
+    const assignMsg = `Du wurdest für "${duty.name}" eingeteilt. Fällig: ${dueDate.toLocaleDateString('de-DE')}`
 
     await prisma.notification.create({
       data: { wgId, userId, type: 'ASSIGNMENT', message: assignMsg },
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
     sendPushToUser(userId, { title: 'Neue Zuteilung', body: assignMsg, url: '/duties' }).catch(() => {})
 
-    return Response.json({ assignment }, { status: 201 })
+    return Response.json({ assignment: { ...assignment, dueDate } }, { status: 201 })
   } catch (error) {
     console.error('POST assignments error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

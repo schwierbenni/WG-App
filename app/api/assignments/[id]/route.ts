@@ -2,14 +2,13 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser, sendPushToWG } from '@/lib/push'
-import { snapToWeekday } from '@/lib/duty-rotation'
+import { withDueDate } from '@/lib/duty-rotation'
 
 const patchAssignmentSchema = z.union([
   z.object({ action: z.enum(['complete', 'uncomplete']) }),
   z.object({
     dutyId: z.string().optional(),
     userId: z.string().optional(),
-    dueDate: z.string().datetime().optional(),
   }),
 ])
 
@@ -34,7 +33,7 @@ export async function GET(
 
     if (!assignment) return Response.json({ error: 'Assignment not found' }, { status: 404 })
 
-    return Response.json({ assignment })
+    return Response.json({ assignment: withDueDate(assignment) })
   } catch (error) {
     console.error('GET assignment error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
@@ -71,24 +70,16 @@ export async function PATCH(
         updateData = { completedAt: null, completedBy: null, overdueNotifiedAt: null }
       }
     } else {
-      const { dutyId, userId, dueDate } = parsed.data
+      const { dutyId, userId } = parsed.data
       if (dutyId) updateData.dutyId = dutyId
       if (userId) updateData.userId = userId
-      if (dueDate) {
-        let dueWeekday = existing.duty.dueWeekday
-        if (dutyId && dutyId !== existing.dutyId) {
-          const newDuty = await prisma.duty.findUnique({ where: { id: dutyId, wgId } })
-          dueWeekday = newDuty?.dueWeekday ?? null
-        }
-        updateData.dueDate = snapToWeekday(new Date(dueDate), dueWeekday)
-      }
     }
 
     const assignment = await prisma.dutyAssignment.update({
       where: { id },
       data: updateData,
       include: {
-        duty: { select: { id: true, name: true, emoji: true, color: true } },
+        duty: { select: { id: true, name: true, emoji: true, color: true, rotationInterval: true, dueWeekday: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
     })
@@ -119,7 +110,7 @@ export async function PATCH(
       sendPushToWG(wgId, { title: 'Dienst erledigt ✓', body: wgMsg, url: '/duties' }, existing.userId).catch(() => {})
     }
 
-    return Response.json({ assignment })
+    return Response.json({ assignment: withDueDate(assignment) })
   } catch (error) {
     console.error('PATCH assignment error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

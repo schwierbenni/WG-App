@@ -40,7 +40,6 @@ export const updateDutySchema = dutySchema.partial().extend({
 export const assignmentSchema = z.object({
   dutyId: z.string().min(1),
   userId: z.string().min(1),
-  dueDate: z.string().datetime({ message: 'Ungültiges Datum' }),
 })
 
 export const swapRequestSchema = z.object({

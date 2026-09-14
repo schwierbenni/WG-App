@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { getAssignmentDueDate } from '@/lib/duty-rotation'
 
 const updateDutySchema = z.object({
   name: z.string().min(1).optional(),
@@ -31,7 +32,7 @@ export async function GET(
       include: {
         assignments: {
           include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
-          orderBy: { dueDate: 'desc' },
+          orderBy: { createdAt: 'desc' },
           take: 10,
         },
       },
@@ -39,7 +40,12 @@ export async function GET(
 
     if (!duty) return Response.json({ error: 'Duty not found' }, { status: 404 })
 
-    return Response.json({ duty })
+    const dutyWithDueDates = {
+      ...duty,
+      assignments: duty.assignments.map((a) => ({ ...a, dueDate: getAssignmentDueDate(duty, a) })),
+    }
+
+    return Response.json({ duty: dutyWithDueDates })
   } catch (error) {
     console.error('GET duty error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })

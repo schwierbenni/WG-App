@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getInitials, formatDate } from '@/lib/utils'
+import { getInitials, getDueLabel } from '@/lib/utils'
 
 interface SimpleUser {
   id: string
@@ -29,7 +29,7 @@ interface SwapRequestDetail {
   assignment: {
     id: string
     dueDate: string
-    duty: { id: string; name: string; emoji?: string | null; color: string }
+    duty: { id: string; name: string; emoji?: string | null; color: string; dueWeekday?: number | null }
   }
 }
 
@@ -135,7 +135,7 @@ export function SwapResponseModal({ swapId, onClose, onSuccess }: Props) {
                 {swap.assignment.duty.name}
               </p>
               <p className="text-xs text-gray-500">
-                Fällig: {formatDate(swap.assignment.dueDate)}
+                Fällig: {getDueLabel(swap.assignment.dueDate, swap.assignment.duty.dueWeekday)}
               </p>
             </div>
 

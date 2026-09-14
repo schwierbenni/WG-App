@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { DutyCard } from '@/components/dashboard/duty-card'
 import { AssignmentOverview } from '@/components/dashboard/assignment-overview'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDate, formatCurrency, getDueLabel } from '@/lib/utils'
+import { getAssignmentDueDate } from '@/lib/duty-rotation'
 import {
   ClipboardList, Megaphone, ArrowLeftRight, AlertCircle,
   ShoppingCart, Wallet, Calendar, Receipt,
@@ -111,20 +112,17 @@ export default async function DashboardPage() {
     prisma.dutyAssignment.findMany({
       where: { wgId, userId, completedAt: null },
       include: {
-        duty: { select: { id: true, name: true, emoji: true, color: true, checklistItems: true } },
+        duty: { select: { id: true, name: true, emoji: true, color: true, checklistItems: true, rotationInterval: true, dueWeekday: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
-      orderBy: { dueDate: 'asc' },
     }),
     // All open assignments for timeline + overview
     prisma.dutyAssignment.findMany({
       where: { wgId, completedAt: null },
       include: {
-        duty: { select: { id: true, name: true, emoji: true, color: true, checklistItems: true } },
+        duty: { select: { id: true, name: true, emoji: true, color: true, checklistItems: true, rotationInterval: true, dueWeekday: true } },
         user: { select: { id: true, name: true, email: true, avatarUrl: true } },
       },
-      orderBy: { dueDate: 'asc' },
-      take: 50,
     }),
     // Recent announcements
     prisma.announcement.findMany({
@@ -139,7 +137,7 @@ export default async function DashboardPage() {
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         assignment: {
-          include: { duty: { select: { id: true, name: true, emoji: true } } },
+          include: { duty: { select: { id: true, name: true, emoji: true, rotationInterval: true, dueWeekday: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -166,12 +164,16 @@ export default async function DashboardPage() {
   ])
 
   // ── Categorise my assignments ────────────────────────────────────────────
+  const myAssignmentsSorted = [...myAssignmentsRaw].sort(
+    (a, b) => getAssignmentDueDate(a.duty, a).getTime() - getAssignmentDueDate(b.duty, b).getTime()
+  )
+
   const overdue: typeof myAssignmentsRaw = []
   const thisWeek: typeof myAssignmentsRaw = []
   const later: typeof myAssignmentsRaw = []
 
-  for (const a of myAssignmentsRaw) {
-    const due = new Date(a.dueDate)
+  for (const a of myAssignmentsSorted) {
+    const due = getAssignmentDueDate(a.duty, a)
     if (due < now) overdue.push(a)
     else if (due <= weekFromNow) thisWeek.push(a)
     else later.push(a)
@@ -181,7 +183,8 @@ export default async function DashboardPage() {
 
   // ── Next 5 upcoming duties (whole WG) ───────────────────────────────────
   const upcomingAll = allAssignmentsRaw
-    .filter((a) => new Date(a.dueDate) >= now)
+    .filter((a) => getAssignmentDueDate(a.duty, a) >= now)
+    .sort((a, b) => getAssignmentDueDate(a.duty, a).getTime() - getAssignmentDueDate(b.duty, b).getTime())
     .slice(0, 5)
 
   // ── Balance ─────────────────────────────────────────────────────────────
@@ -232,7 +235,7 @@ export default async function DashboardPage() {
   // Serialise Date objects to strings for client components
   const allAssignments = allAssignmentsRaw.map((a) => ({
     ...a,
-    dueDate: a.dueDate.toISOString(),
+    dueDate: getAssignmentDueDate(a.duty, a).toISOString(),
     completedAt: a.completedAt?.toISOString() ?? null,
   }))
 
@@ -374,7 +377,7 @@ export default async function DashboardPage() {
                     <span className="font-semibold">{req.fromUser.name}</span> möchte{' '}
                     {req.assignment.duty.emoji && <span className="mr-0.5">{req.assignment.duty.emoji}</span>}
                     <span className="font-semibold">{req.assignment.duty.name}</span> tauschen
-                    (fällig: {formatDate(req.assignment.dueDate.toISOString())})
+                    (fällig: {formatDate(getAssignmentDueDate(req.assignment.duty, req.assignment).toISOString())})
                   </Link>
                 ))}
                 {swapRequests.length > 3 && (
@@ -410,7 +413,7 @@ export default async function DashboardPage() {
                       {overdue.map((a) => (
                         <DutyCard
                           key={a.id}
-                          assignment={{ ...a, dueDate: a.dueDate.toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
+                          assignment={{ ...a, dueDate: getAssignmentDueDate(a.duty, a).toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
                           members={members}
                         />
                       ))}
@@ -427,7 +430,7 @@ export default async function DashboardPage() {
                       {thisWeek.map((a) => (
                         <DutyCard
                           key={a.id}
-                          assignment={{ ...a, dueDate: a.dueDate.toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
+                          assignment={{ ...a, dueDate: getAssignmentDueDate(a.duty, a).toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
                           members={members}
                         />
                       ))}
@@ -444,7 +447,7 @@ export default async function DashboardPage() {
                       {later.map((a) => (
                         <DutyCard
                           key={a.id}
-                          assignment={{ ...a, dueDate: a.dueDate.toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
+                          assignment={{ ...a, dueDate: getAssignmentDueDate(a.duty, a).toISOString(), completedAt: a.completedAt?.toISOString() ?? null }}
                           members={members}
                         />
                       ))}
@@ -462,7 +465,7 @@ export default async function DashboardPage() {
               <div className="rounded-2xl border-2 border-surface-border bg-surface overflow-hidden shadow-sm divide-y divide-surface-border">
                 {upcomingAll.map((a) => {
                   const isMe = a.user.id === userId
-                  const dueDate = new Date(a.dueDate)
+                  const dueDate = getAssignmentDueDate(a.duty, a)
                   const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
                   return (
                     <div
@@ -481,7 +484,7 @@ export default async function DashboardPage() {
                         </div>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="text-xs font-semibold text-foreground">{formatDate(a.dueDate)}</p>
+                        <p className="text-xs font-semibold text-foreground capitalize">{getDueLabel(dueDate, a.duty.dueWeekday)}</p>
                         <p className={`text-[11px] font-medium ${daysLeft <= 2 ? 'text-[var(--danger)]' : daysLeft <= 7 ? 'text-[var(--warning)]' : 'text-[var(--text-subtle)]'}`}>
                           {daysLeft === 0 ? 'Heute' : daysLeft === 1 ? 'Morgen' : `in ${daysLeft} Tagen`}
                         </p>

@@ -42,6 +42,18 @@ export function getWeekdayLabel(weekday: number | null | undefined): string | nu
   return WEEKDAY_LABELS[weekday] ?? null
 }
 
+const WEEKDAY_ADVERBS = ['sonntags', 'montags', 'dienstags', 'mittwochs', 'donnerstags', 'freitags', 'samstags']
+
+// Duties with a fixed Stichtag-Wochentag show that weekday instead of a
+// concrete calendar date — the exact date is just an internal computation,
+// not something members should have to think about.
+export function getDueLabel(dueDate: Date | string | null | undefined, weekday?: number | null): string {
+  if (weekday !== null && weekday !== undefined && WEEKDAY_ADVERBS[weekday]) {
+    return WEEKDAY_ADVERBS[weekday]
+  }
+  return formatDate(dueDate)
+}
+
 export function formatCurrency(amount: number, currency = 'EUR'): string {
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(amount)
 }

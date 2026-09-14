@@ -127,7 +127,6 @@ model DutyAssignment {
   wgId              String
   dutyId            String
   userId            String
-  dueDate           DateTime
   completedAt       DateTime?
   completedBy       String?
   overdueNotifiedAt DateTime?
@@ -140,7 +139,7 @@ model DutyAssignment {
 
   @@index([wgId])
   @@index([wgId, completedAt])
-  @@index([wgId, dueDate])
+  @@index([wgId, createdAt])
   @@index([userId])
   @@index([dutyId])
 }

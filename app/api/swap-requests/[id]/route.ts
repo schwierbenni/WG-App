@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser } from '@/lib/push'
+import { getAssignmentDueDate } from '@/lib/duty-rotation'
 
 const patchSwapSchema = z.object({
   action: z.enum(['accept', 'reject']),
@@ -24,7 +25,7 @@ export async function GET(
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
-        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true } } } },
+        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true, rotationInterval: true, dueWeekday: true } } } },
       },
     })
 
@@ -35,7 +36,12 @@ export async function GET(
       return Response.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    return Response.json({ swapRequest })
+    return Response.json({
+      swapRequest: {
+        ...swapRequest,
+        assignment: { ...swapRequest.assignment, dueDate: getAssignmentDueDate(swapRequest.assignment.duty, swapRequest.assignment) },
+      },
+    })
   } catch (error) {
     console.error('GET swap-request error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
@@ -82,7 +88,7 @@ export async function PATCH(
       include: {
         fromUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
         toUser: { select: { id: true, name: true, email: true, avatarUrl: true } },
-        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true } } } },
+        assignment: { include: { duty: { select: { id: true, name: true, emoji: true, color: true, rotationInterval: true, dueWeekday: true } } } },
       },
     })
 
@@ -126,7 +132,12 @@ export async function PATCH(
       sendPushToUser(swapRequest.fromUserId, { title: 'Tausch abgelehnt', body: rejectMsg, url: '/duties' }).catch(() => {})
     }
 
-    return Response.json({ swapRequest: updated })
+    return Response.json({
+      swapRequest: {
+        ...updated,
+        assignment: { ...updated.assignment, dueDate: getAssignmentDueDate(updated.assignment.duty, updated.assignment) },
+      },
+    })
   } catch (error) {
     console.error('PATCH swap-request error:', error)
     return Response.json({ error: 'Internal server error' }, { status: 500 })
