@@ -1,25 +1,21 @@
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { sendPushToWG } from '@/lib/push'
+import { berlinDayRange } from '@/lib/calendar-reminders'
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 })
   }
 
   logger.info('iCal Erinnerungscron gestartet')
 
   const now = new Date()
-  const dayStart = new Date(now)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(now)
-  dayEnd.setHours(23, 59, 59, 999)
-
   try {
     const events = await prisma.iCalEvent.findMany({
       where: {
-        startDate: { gte: dayStart, lte: dayEnd },
+        startDate: berlinDayRange(now),
       },
       include: {
         calendar: { select: { id: true, name: true, emoji: true, wgId: true } },

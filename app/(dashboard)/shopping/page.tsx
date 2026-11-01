@@ -60,6 +60,22 @@ export default function ShoppingPage() {
   const [note, setNote] = React.useState('')
   const [submitting, setSubmitting] = React.useState(false)
   const [submitError, setSubmitError] = React.useState('')
+  const nameInput = React.useRef<HTMLInputElement>(null)
+  const submitPending = React.useRef(false)
+  const focusAfterSubmit = React.useRef(false)
+
+  React.useEffect(() => {
+    if (!submitting && focusAfterSubmit.current) {
+      focusAfterSubmit.current = false
+      nameInput.current?.focus()
+    }
+  }, [submitting])
+
+  const handleEntryKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
+    event.preventDefault()
+    if (!event.repeat && !submitPending.current) event.currentTarget.form?.requestSubmit()
+  }
 
   const [actionLoading, setActionLoading] = React.useState<string | null>(null)
 
@@ -107,7 +123,8 @@ export default function ShoppingPage() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim()) return
+    if (!name.trim() || submitPending.current) return
+    submitPending.current = true
     setSubmitting(true)
     setSubmitError('')
     try {
@@ -120,6 +137,7 @@ export default function ShoppingPage() {
       if (!res.ok) {
         setSubmitError(data.error ?? 'Fehler beim Hinzufügen')
       } else {
+        focusAfterSubmit.current = true
         setName('')
         setNote('')
         setItems((prev) => [data.item, ...prev])
@@ -127,6 +145,7 @@ export default function ShoppingPage() {
     } catch {
       setSubmitError('Netzwerkfehler. Bitte erneut versuchen.')
     } finally {
+      submitPending.current = false
       setSubmitting(false)
     }
   }
@@ -211,6 +230,9 @@ export default function ShoppingPage() {
                 <Label htmlFor="item-name" className="sr-only">Artikelname</Label>
                 <Input
                   id="item-name"
+                  ref={nameInput}
+                  enterKeyHint="done"
+                  onKeyDown={handleEntryKeyDown}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Artikelname..."
@@ -239,6 +261,8 @@ export default function ShoppingPage() {
               <Label htmlFor="item-note" className="sr-only">Notiz (optional)</Label>
               <Input
                 id="item-note"
+                enterKeyHint="done"
+                onKeyDown={handleEntryKeyDown}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Notiz (optional)..."

@@ -1,10 +1,11 @@
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { sendPushToWG } from '@/lib/push'
+import { berlinDayRange, isYellowBagCollection, yellowBagReminder } from '@/lib/calendar-reminders'
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -12,15 +13,8 @@ export async function GET(request: Request) {
 
   const now = new Date()
 
-  const todayStart = new Date(now)
-  todayStart.setHours(0, 0, 0, 0)
-  const todayEnd = new Date(now)
-  todayEnd.setHours(23, 59, 59, 999)
-
-  const tomorrowStart = new Date(todayStart)
-  tomorrowStart.setDate(tomorrowStart.getDate() + 1)
-  const tomorrowEnd = new Date(todayEnd)
-  tomorrowEnd.setDate(tomorrowEnd.getDate() + 1)
+  const today = berlinDayRange(now)
+  const tomorrow = berlinDayRange(now, 1)
 
   let notified = 0
   const errors: string[] = []
@@ -29,22 +23,16 @@ export async function GET(request: Request) {
     // Vorab-Erinnerung (1 Tag vorher) für Gelber Sack
     const tomorrowGelberSackEvents = await prisma.iCalEvent.findMany({
       where: {
-        startDate: { gte: tomorrowStart, lte: tomorrowEnd },
-        title: { contains: 'Gelber Sack', mode: 'insensitive' },
+        startDate: tomorrow,
+        title: { contains: 'gelb', mode: 'insensitive' },
       },
       include: { calendar: { select: { id: true, name: true, emoji: true, wgId: true } } },
     })
 
-    for (const event of tomorrowGelberSackEvents) {
+    for (const event of tomorrowGelberSackEvents.filter((event) => isYellowBagCollection(event.title))) {
       try {
         const { wgId } = event.calendar
-        const dateStr = event.startDate.toLocaleDateString('de-DE', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          timeZone: 'Europe/Berlin',
-        })
-        const msg = `${event.title} – morgen, ${dateStr}`
+        const msg = yellowBagReminder(event.title, event.startDate)
 
         const wgMembers = await prisma.user.findMany({ where: { wgId }, select: { id: true } })
         await prisma.notification.createMany({
@@ -56,7 +44,7 @@ export async function GET(request: Request) {
             link: '/calendar',
           })),
         })
-        sendPushToWG(wgId, { title: `🗑️ Gelber Sack morgen`, body: msg, url: '/calendar' }).catch(() => {})
+        await sendPushToWG(wgId, { title: '🗑️ Gelber Sack morgen früh', body: msg, url: '/calendar' })
         notified++
         logger.info('Morgen-Erinnerung (Gelber Sack) gesendet', { eventId: event.id, title: event.title, wgId })
       } catch (err) {
@@ -65,43 +53,9 @@ export async function GET(request: Request) {
       }
     }
 
-    const todayIcalEvents = await prisma.iCalEvent.findMany({
-      where: { startDate: { gte: todayStart, lte: todayEnd } },
-      include: { calendar: { select: { id: true, name: true, emoji: true, wgId: true } } },
-    })
-
-    for (const event of todayIcalEvents) {
-      try {
-        const { wgId, emoji, name: calName } = event.calendar
-        const dateStr = event.startDate.toLocaleDateString('de-DE', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-          timeZone: 'Europe/Berlin',
-        })
-        const msg = `${event.title} – heute, ${dateStr}`
-
-        const wgMembers = await prisma.user.findMany({ where: { wgId }, select: { id: true } })
-        await prisma.notification.createMany({
-          data: wgMembers.map((u) => ({
-            wgId,
-            userId: u.id,
-            type: 'ICAL_REMINDER' as const,
-            message: msg,
-            link: '/calendar',
-          })),
-        })
-        sendPushToWG(wgId, { title: `${emoji} ${calName}`, body: msg, url: '/calendar' }).catch(() => {})
-        notified++
-        logger.info('Heute-Erinnerung (iCal) gesendet', { eventId: event.id, title: event.title, wgId })
-      } catch (err) {
-        errors.push(`iCal heute - ${event.title}: ${String(err)}`)
-        logger.error('Fehler bei Heute-Erinnerung (iCal)', { eventId: event.id, error: String(err) })
-      }
-    }
-
+    // Same-day imported-calendar reminders are handled only by /api/ical/cron.
     const todayWgEvents = await prisma.wGEvent.findMany({
-      where: { startDate: { gte: todayStart, lte: todayEnd } },
+      where: { startDate: today },
     })
 
     for (const event of todayWgEvents) {
