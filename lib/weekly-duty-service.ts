@@ -9,6 +9,7 @@ import {
   weekTiming,
   reminderStage,
   dutyMessage,
+  weeklyRoleMessage,
 } from './weekly-duty'
 
 type Tx = Prisma.TransactionClient
@@ -138,9 +139,7 @@ export async function runWeeklyDutyPlan(wgId: string, now = new Date()) {
           (a) => a.userId === member.id,
         )
         const duty = duties.find((d) => d.id === assignment?.dutyId)
-        const message = duty
-          ? `Dein Dienst in der Woche ab ${week}: ${duty.name}. Zeit bis Sonntagabend.`
-          : `In der Woche ab ${week} hast du frei! 🎉`
+        const message = weeklyRoleMessage(duty?.name)
         await queueWeeklyNotice(
           tx,
           wgId,

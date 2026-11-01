@@ -25,7 +25,7 @@ export function weekTiming(week: string) {
   const end = berlinDayRange(noon, 6).lt
   return {
     infoAt: new Date(+berlinDayRange(noon).gte + 7 * 60 * 60 * 1000),
-    reminder: berlinDayRange(noon, 5).gte,
+    reminder: new Date(+end - 15 * 60 * 60 * 1000),
     end,
     deadline: new Date(+end - 1),
     graceEnd: berlinDayRange(noon, 7).lt,
@@ -78,9 +78,9 @@ export function dutyMessage(
 ): string {
   switch (stage) {
     case 'reminder':
-      return `${name}: „${duty}“ ist noch offen. Bitte bis Sonntagabend erledigen.`
+      return `Eieiei, ${name} hat noch keinen ${duty} gemacht.`
     case 'overdue':
-      return `${name} ist ein Hurensohn und hat „${duty}“ nicht rechtzeitig erledigt. Heute ist noch Nachholtag.`
+      return `${name} ist ein Hurensohn und hat den ${duty} nicht geschafft.`
     case 'escalation':
       return `${name} ist der größte Wichser auf Erden und hat „${duty}“ auch am Nachholtag nicht erledigt.`
     case 'complete':
@@ -88,4 +88,23 @@ export function dutyMessage(
     case 'late':
       return `${name} hat „${duty}“ nachgeholt. Endlich! ✓`
   }
+}
+
+export function weeklyRoleMessage(duty?: string): string {
+  return duty
+    ? `Glückwunsch! Du hast diese Woche ${duty}.`
+    : 'Masallah einfach frei 🍻'
+}
+
+export function isSundayReminderWindow(now: Date): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Berlin',
+    weekday: 'short',
+    hour: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now)
+  return (
+    parts.find((p) => p.type === 'weekday')?.value === 'Sun' &&
+    parts.find((p) => p.type === 'hour')?.value === '09'
+  )
 }

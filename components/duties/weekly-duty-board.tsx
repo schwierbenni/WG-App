@@ -260,7 +260,7 @@ export function WeeklyDutyBoard({
                 </label>
               ))}
               <p className="text-sm">
-                Montag: persönliche Wocheninfo, auch bei Frei. Samstag:
+                Montag: persönliche Wocheninfo, auch bei Frei. Sonntag, 9 Uhr:
                 Erinnerung an alle für offene Dienste. Sonntagabend: Frist.
                 Montag: Nachholen und erste Eskalation an alle. Dienstag: zweite
                 Eskalation an alle. Die Meldungen enthalten die vereinbarten

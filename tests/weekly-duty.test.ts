@@ -7,6 +7,8 @@ import {
   reminderStage,
   addDateDays,
   dutyMessage,
+  weeklyRoleMessage,
+  isSundayReminderWindow,
 } from '../lib/weekly-duty'
 const members = ['p0', 'p1', 'p2', 'p3', 'p4'],
   duties = ['bath', 'living', 'supply', 'kitchen']
@@ -98,4 +100,44 @@ test('requested message wording and late completion are distinct', () => {
   assert.match(dutyMessage('overdue', 'Testperson', 'Bad'), /Hurensohn/)
   assert.match(dutyMessage('escalation', 'Testperson', 'Bad'), /größte Wichser/)
   assert.match(dutyMessage('late', 'Testperson', 'Bad'), /nachgeholt/)
+})
+
+test('exact personal texts and revised group messages', () => {
+  assert.equal(
+    weeklyRoleMessage('Küchendienst'),
+    'Glückwunsch! Du hast diese Woche Küchendienst.',
+  )
+  assert.equal(weeklyRoleMessage(), 'Masallah einfach frei 🍻')
+  assert.equal(
+    dutyMessage('reminder', 'Benni', 'Küchendienst'),
+    'Eieiei, Benni hat noch keinen Küchendienst gemacht.',
+  )
+  assert.equal(
+    dutyMessage('overdue', 'Benni', 'Küchendienst'),
+    'Benni ist ein Hurensohn und hat den Küchendienst nicht geschafft.',
+  )
+})
+for (const [week, instant] of [
+  ['2026-11-02', '2026-11-08T08:00:00Z'],
+  ['2026-03-23', '2026-03-29T07:00:00Z'],
+  ['2026-10-19', '2026-10-25T08:00:00Z'],
+])
+  test(`Sunday 09:00 Berlin: ${week}`, () => {
+    assert.equal(
+      weekTiming(week).reminder.toISOString(),
+      new Date(instant).toISOString(),
+    )
+    assert.equal(isSundayReminderWindow(new Date(instant)), true)
+    assert.equal(
+      isSundayReminderWindow(new Date(+new Date(instant) - 1000)),
+      false,
+    )
+    assert.equal(
+      isSundayReminderWindow(new Date(+new Date(instant) + 3600000)),
+      false,
+    )
+  })
+test('Saturday and Monday do not run the Sunday reminder cron', () => {
+  assert.equal(isSundayReminderWindow(new Date('2026-11-07T08:00:00Z')), false)
+  assert.equal(isSundayReminderWindow(new Date('2026-11-09T08:00:00Z')), false)
 })

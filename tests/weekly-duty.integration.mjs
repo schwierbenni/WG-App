@@ -121,6 +121,7 @@ for (const [name, file] of [
   ['service', 'lib/weekly-duty-service.ts'],
   ['assignment', 'app/api/assignments/[id]/route.ts'],
   ['weekly', 'app/api/duties/weekly/route.ts'],
+  ['reminder', 'lib/weekly-duty-reminder-cron.ts'],
 ]) {
   await build({
     entryPoints: [file],
@@ -223,6 +224,13 @@ assert.equal(
   5,
 )
 await run('2026-11-07T07:00:00Z')
+assert.equal(
+  await prisma.notification.count({
+    where: { deliveryKey: { contains: ':reminder:' } },
+  }),
+  0,
+)
+await run('2026-11-08T08:00:00Z')
 assert.equal(
   await prisma.notification.count({
     where: { deliveryKey: { contains: ':reminder:' } },
@@ -422,6 +430,28 @@ assert.equal(board.assignments.length, 4)
 assert.equal(board.legacyBacklog.length, 1)
 assert.equal(board.legacyBacklog[0].id, 'legacy')
 assert(board.members.every((m) => m.id !== 'outsider'))
+const reminder = require(resolve('tmp/weekly-reminder.cjs'))
+const cron = (header) =>
+  reminder.GET(
+    new Request('http://local', {
+      headers: header ? { authorization: header } : {},
+    }),
+  )
+delete process.env.CRON_SECRET
+assert.equal((await cron('Bearer undefined')).status, 401)
+process.env.CRON_SECRET = 'fixture-only'
+assert.equal((await cron()).status, 401)
+clock = '2026-12-06T07:59:59Z'
+assert.deepEqual(await (await cron('Bearer fixture-only')).json(), {
+  skipped: true,
+})
+clock = '2026-12-06T08:00:00Z'
+assert.deepEqual(await (await cron('Bearer fixture-only')).json(), {
+  errors: [],
+})
+const afterSunday = await prisma.notification.count()
+await cron('Bearer fixture-only')
+assert.equal(await prisma.notification.count(), afterSunday)
 const rls = (
   await db.query(
     `SELECT relrowsecurity FROM pg_class WHERE relname = 'WeeklyDutyPlan'`,
