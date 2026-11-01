@@ -21,4 +21,8 @@ The next person follows the latest actual assignee in that duty's own order. Out
 - TypeScript and production webpack build passed locally. Prisma client generated locally; no database commands applied.
 - Full scoped ESLint reports two pre-existing react-hooks/set-state-in-effect violations in the shopping page's existing fetch/default-category effects. The unchanged HEAD version reproduces both. With that one baseline rule disabled for the check, the changed files pass. No lint configuration changed and no full-lint-green claim.
 
-Deployment verification will be appended after the GitHub/Vercel result is known. Real delivery to residents' devices additionally requires enabled push subscriptions and the configured cron; no claim of a received device notification is made from local tests.
+Application commit: `71655e174879581563e2cadaf653f8e338d5da0e`. GitHub reports successful Vercel Preview deployment (context Vercel, "Deployment has completed", deployment CvAD7tfHKxMgUmJFbhv9W4egM59q). PR: https://github.com/schwierbenni/WG-App/pull/76.
+
+The preview redirects to Vercel's "You Need Access" page: a team owner must approve access. The existing Vercel connector also returns 403 for the owner's team. No access request was sent, no protection disabled and no production branch modified. The hosted authenticated smoke and actual device delivery remain unverified; therefore this PR is not yet merged/live. Owner access to this specific preview is needed to finish that smoke.
+
+Real delivery to residents' devices additionally requires enabled push subscriptions and the configured cron; no claim of a received device notification is made from local tests.
