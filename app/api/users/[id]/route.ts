@@ -106,6 +106,8 @@ export async function DELETE(
     const existing = await prisma.user.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Benutzer nicht gefunden.' }, { status: 404 })
 
+    const weeklyPlan=await prisma.weeklyDutyPlan.findUnique({where:{wgId}})
+    if(weeklyPlan?.memberOrder.includes(id))return Response.json({error:'Diese Person gehört zum festen Wochenplan. Der Plan muss vor einem Auszug angepasst werden.'},{status:409})
     await prisma.user.delete({ where: { id } })
     logger.info('Benutzer gelöscht', { deletedId: id, by: session.user.id })
     return new Response(null, { status: 204 })

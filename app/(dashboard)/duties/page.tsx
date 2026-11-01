@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { useSession } from 'next-auth/react'
+import { WeeklyDutyBoard } from '@/components/duties/weekly-duty-board'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Clock,
@@ -118,6 +119,7 @@ interface PendingOutSwap {
 
 export default function DutiesPage() {
   const { data: session } = useSession()
+  const [weeklyActive, setWeeklyActive] = React.useState(false)
   const [duties, setDuties] = React.useState<DutyWithAssignment[]>([])
   const [members, setMembers] = React.useState<SimpleUser[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -246,10 +248,10 @@ export default function DutiesPage() {
     return { all, offen, erledigt, überfällig }
   }, [duties])
 
-  const isAdmin = (session?.user as { role?: string })?.role === 'ADMIN'
-
   return (
-    <div className="space-y-6">
+    <>
+    <WeeklyDutyBoard onStatus={setWeeklyActive} />
+    <div hidden={weeklyActive} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dienste</h1>
@@ -317,10 +319,10 @@ export default function DutiesPage() {
             const assignment = duty.assignments[0]
             const status = getDutyStatus(assignment)
             const isMyAssignment = assignment?.user?.id === session?.user?.id
-            const canComplete = assignment && !assignment.completedAt && (isMyAssignment || isAdmin)
+            const canComplete = assignment && !assignment.completedAt && isMyAssignment
             const canUncomplete =
               assignment?.completedAt &&
-              (isAdmin || assignment.completedBy === session?.user?.id)
+              (isMyAssignment && assignment.completedBy === session?.user?.id)
             const pendingSwap = assignment
               ? pendingOut.find((p) => p.assignmentId === assignment.id) ?? null
               : null
@@ -535,5 +537,6 @@ export default function DutiesPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </>
   )
 }

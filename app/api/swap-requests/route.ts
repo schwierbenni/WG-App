@@ -60,6 +60,7 @@ export async function POST(request: Request) {
 
     const assignment = await prisma.dutyAssignment.findUnique({ where: { id: assignmentId, wgId }, include: { duty: true } })
     if (!assignment) return Response.json({ error: 'Assignment not found' }, { status: 404 })
+    if(assignment.weekStart)return Response.json({error:'Dieser Dienst gehört zum festen Wochenplan.'},{status:409})
     if (assignment.userId !== fromUserId) return Response.json({ error: 'This assignment does not belong to you' }, { status: 403 })
 
     const toUser = await prisma.user.findUnique({ where: { id: toUserId, wgId } })

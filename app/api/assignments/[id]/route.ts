@@ -3,6 +3,8 @@ import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { sendPushToUser, sendPushToWG } from '@/lib/push'
 import { snapToWeekday } from '@/lib/duty-rotation'
+import { queueWeeklyNotice, dispatchWeeklyPush } from '@/lib/weekly-duty-service'
+import { dutyMessage } from '@/lib/weekly-duty'
 
 const patchAssignmentSchema = z.union([
   z.object({ action: z.enum(['complete', 'uncomplete']) }),
@@ -61,6 +63,31 @@ export async function PATCH(
 
     const existing = await prisma.dutyAssignment.findUnique({ where: { id, wgId }, include: { duty: true } })
     if (!existing) return Response.json({ error: 'Assignment not found' }, { status: 404 })
+    if ('action' in parsed.data && existing.userId !== session.user.id) return Response.json({error:'Nur du selbst kannst deinen Dienst abhaken oder zurücknehmen.'},{status:403})
+    if(existing.weekStart){
+      if(!('action' in parsed.data))return Response.json({error:'Die feste Wochenzuteilung kann nicht überschrieben werden.'},{status:409})
+      const action=parsed.data.action
+      const assignment=await prisma.$transaction(async tx=>{
+        await tx.$queryRaw`SELECT id FROM "DutyAssignment" WHERE id = ${id} AND "wgId" = ${wgId} FOR UPDATE`
+        const current=await tx.dutyAssignment.findUniqueOrThrow({where:{id,wgId},include:{user:{select:{name:true}},duty:true}})
+        if(current.userId!==session.user.id)throw new Error('Assignment ownership changed')
+        if(action==='complete'&&!current.completedAt){
+          const now=new Date()
+          await tx.dutyAssignment.update({where:{id,wgId},data:{completedAt:now,completedBy:session.user.id}})
+          await tx.notification.updateMany({where:{wgId,deliveryKey:{startsWith:`weekly:${wgId}:${id}:`},pushSentAt:null},data:{pushSentAt:now}})
+          const members=await tx.user.findMany({where:{wgId},select:{id:true}})
+          const stage=now<=current.dueDate?'complete':'late'
+          await queueWeeklyNotice(tx,wgId,members.map(m=>m.id),`${id}:complete`,'Dienst erledigt ✓',dutyMessage(stage,current.user.name,current.duty.name))
+        }else if(action==='uncomplete'&&current.completedAt){
+          await tx.dutyAssignment.update({where:{id,wgId},data:{completedAt:null,completedBy:null}})
+        }
+        return tx.dutyAssignment.findUniqueOrThrow({where:{id,wgId},include:{user:{select:{id:true,name:true}},duty:{select:{id:true,name:true,emoji:true,color:true}}}})
+      })
+      await dispatchWeeklyPush(wgId)
+      return Response.json({assignment})
+    }
+    if(!('action' in parsed.data)&&session.user.role!=='ADMIN')return Response.json({error:'Forbidden'},{status:403})
+
 
     let updateData: Record<string, unknown> = {}
 
@@ -141,6 +168,7 @@ export async function DELETE(
   try {
     const existing = await prisma.dutyAssignment.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Assignment not found' }, { status: 404 })
+    if(existing.weekStart)return Response.json({error:'Wochendienste bleiben als Verlauf erhalten.'},{status:409})
 
     await prisma.dutyAssignment.delete({ where: { id } })
     return new Response(null, { status: 204 })

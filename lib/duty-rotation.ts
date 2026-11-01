@@ -138,7 +138,7 @@ async function rotateDutyIfDue(duty: Duty): Promise<RotationOutcome> {
  */
 export async function rotateDueDuties(where: { wgId?: string } = {}): Promise<{ rotated: number; errors: string[] }> {
   const duties = await prisma.duty.findMany({
-    where: { isActive: true, isPaused: false, ...where },
+    where: { isActive: true, isPaused: false, wg: { weeklyDutyPlan: { is: null } }, ...where },
   })
 
   let rotated = 0

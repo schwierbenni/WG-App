@@ -68,6 +68,8 @@ export async function PATCH(
 
     const existing = await prisma.duty.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Duty not found' }, { status: 404 })
+    const plan = await prisma.weeklyDutyPlan.findUnique({where:{wgId}})
+    if(plan?.dutyOrder.includes(id) && ['isActive','isPaused','rotationOrder','rotationInterval','dueWeekday'].some(key=>key in parsed.data))return Response.json({error:'Die Zeitplanung dieses Dienstes wird zentral im Wochenplan geregelt.'},{status:409})
 
     const duty = await prisma.duty.update({ where: { id }, data: parsed.data })
 
@@ -93,6 +95,8 @@ export async function DELETE(
   try {
     const existing = await prisma.duty.findUnique({ where: { id, wgId } })
     if (!existing) return Response.json({ error: 'Duty not found' }, { status: 404 })
+    const plan = await prisma.weeklyDutyPlan.findUnique({where:{wgId}})
+    if(plan?.dutyOrder.includes(id))return Response.json({error:'Dieser Dienst gehört zum festen Wochenplan und kann nicht gelöscht werden.'},{status:409})
 
     await prisma.duty.delete({ where: { id } })
     return new Response(null, { status: 204 })

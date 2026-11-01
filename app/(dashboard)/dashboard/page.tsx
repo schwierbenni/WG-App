@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
+import { runWeeklyDutyPlan } from '@/lib/weekly-duty-service'
 import { DutyCard } from '@/components/dashboard/duty-card'
 import { AssignmentOverview } from '@/components/dashboard/assignment-overview'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -93,6 +94,7 @@ export default async function DashboardPage() {
   const wgId = (session.user as { wgId?: string }).wgId
   if (!wgId) redirect('/login')
 
+  await runWeeklyDutyPlan(wgId)
   const now = new Date()
   const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 

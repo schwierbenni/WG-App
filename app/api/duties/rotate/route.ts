@@ -24,6 +24,8 @@ export async function POST(request: Request) {
     }
 
     const { dutyId } = parsed.data
+    const weeklyPlan = await prisma.weeklyDutyPlan.findUnique({where:{wgId}})
+    if(weeklyPlan?.dutyOrder.includes(dutyId))return Response.json({error:'Dieser Dienst wird durch den festen Wochenplan zugeteilt.'},{status:409})
 
     const duty = await prisma.duty.findUnique({ where: { id: dutyId, wgId } })
     if (!duty) return Response.json({ error: 'Duty not found' }, { status: 404 })
