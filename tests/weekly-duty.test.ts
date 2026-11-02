@@ -107,7 +107,7 @@ test('exact personal texts and revised group messages', () => {
     weeklyRoleMessage('Küchendienst'),
     'Glückwunsch! Du hast diese Woche Küchendienst.',
   )
-  assert.equal(weeklyRoleMessage(), 'Masallah einfach frei 🍻')
+  assert.equal(weeklyRoleMessage(), 'Mashallah einfach frei 🍻')
   assert.equal(
     dutyMessage('reminder', 'Benni', 'Küchendienst'),
     'Eieiei, Benni hat noch keinen Küchendienst gemacht.',

@@ -93,7 +93,7 @@ export function dutyMessage(
 export function weeklyRoleMessage(duty?: string): string {
   return duty
     ? `Glückwunsch! Du hast diese Woche ${duty}.`
-    : 'Masallah einfach frei 🍻'
+    : 'Mashallah einfach frei 🍻'
 }
 
 export function isSundayReminderWindow(now: Date): boolean {

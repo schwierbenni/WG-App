@@ -56,6 +56,6 @@ Until these steps are completed, the requested new plan is **prepared, not activ
 
 ## Notification copy revision
 
-Personal role: “Glückwunsch! Du hast diese Woche {duty}.” Free week: “Masallah einfach frei 🍻”. Sunday reminder: “Eieiei, {name} hat noch keinen {duty} gemacht.” Monday: “{name} ist ein Hurensohn und hat den {duty} nicht geschafft.” Completion, Tuesday escalation and late-completion texts remain unchanged. Timing and exact copy are covered by additional domain and actual cron-handler integration tests. This is part of the prepared feature, not an activated production change.
+Personal role: “Glückwunsch! Du hast diese Woche {duty}.” Free week: “Mashallah einfach frei 🍻”. Sunday reminder: “Eieiei, {name} hat noch keinen {duty} gemacht.” Monday: “{name} ist ein Hurensohn und hat den {duty} nicht geschafft.” Completion, Tuesday escalation and late-completion texts remain unchanged. Timing and exact copy are covered by additional domain and actual cron-handler integration tests. This is part of the prepared feature, not an activated production change.
 
 Revision checks: 14 domain cases and real PostgreSQL/Prisma integration including cron authorization, no Saturday/before-09:00 send, Sunday send and repeated-call deduplication passed. Scoped ESLint, TypeScript and the production webpack build passed. No production configuration changed; the revision remains in the draft feature PR.
