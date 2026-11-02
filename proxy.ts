@@ -7,6 +7,15 @@ const { auth } = NextAuth(authConfig)
 export default auth((req) => {
   const isLoggedIn = !!req.auth
   const { pathname } = req.nextUrl
+  const cronPaths = new Set([
+    '/api/duties/cron', '/api/calendar/cron', '/api/ical/cron',
+    '/api/announcements/cron', '/api/duties/reminder-early', '/api/duties/reminder-late',
+  ])
+  if (cronPaths.has(pathname)) {
+    return process.env.CRON_SECRET && req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`
+      ? NextResponse.next()
+      : new NextResponse('Unauthorized', { status: 401 })
+  }
 
   const isAuthPage =
     pathname.startsWith('/login') ||

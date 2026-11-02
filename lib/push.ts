@@ -3,6 +3,9 @@ import { prisma } from './db'
 
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY
+const applicationOrigin = process.env.NEXT_PUBLIC_APP_URL
+  ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
+  : null
 if (vapidPublicKey && vapidPrivateKey) {
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT ?? 'mailto:admin@flatmate.app',
@@ -20,7 +23,7 @@ export interface PushPayload {
 
 export async function sendPushToUser(userId: string, payload: PushPayload) {
   const subscriptions = await prisma.pushSubscription.findMany({
-    where: { userId },
+    where: { userId, applicationOrigin },
   })
 
   const results = await Promise.allSettled(
@@ -45,6 +48,7 @@ export async function sendPushToWG(wgId: string, payload: PushPayload, excludeUs
   const subscriptions = await prisma.pushSubscription.findMany({
     where: {
       user: { wgId },
+      applicationOrigin,
       ...(excludeUserId ? { userId: { not: excludeUserId } } : {}),
     },
   })
