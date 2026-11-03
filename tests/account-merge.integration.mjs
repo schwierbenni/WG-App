@@ -1,0 +1,57 @@
+import { readFileSync } from 'node:fs'
+import assert from 'node:assert/strict'
+import { createTestDatabase } from './support/prisma-pglite.mjs'
+
+const { db, prisma: p, close } = await createTestDatabase()
+try {
+  await db.exec(readFileSync('tmp/weekly-baseline.sql', 'utf8'))
+  await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE SCHEMA wg_hosting;')
+  await db.exec(readFileSync('prisma/migrations/20261101230000_weekly_duty_plan/migration.sql', 'utf8'))
+  await p.wGConfig.create({data:{id:'wg',name:'Synthetic',inviteCode:'fixture'}})
+  for (const id of ['old','new','third']) await p.user.create({data:{id,wgId:'wg',name:id,email:`${id}@example.invalid`,passwordHash:`synthetic-${id}`}})
+  const target = await p.user.findUnique({where:{id:'new'}})
+  await p.duty.create({data:{id:'duty',wgId:'wg',name:'Test',rotationOrder:['old','new','third'],checklistItems:[]}})
+  await p.dutyAssignment.create({data:{id:'assignment',wgId:'wg',dutyId:'duty',userId:'old',completedBy:'old',dueDate:new Date()}})
+  await p.swapRequest.create({data:{id:'swap',wgId:'wg',assignmentId:'assignment',fromUserId:'old',toUserId:'third'}})
+  await p.dutySwapIOU.create({data:{id:'iou',wgId:'wg',dutyId:'duty',debitorId:'third',creditorId:'old'}})
+  await p.announcement.create({data:{id:'announcement',wgId:'wg',authorId:'old',assignedUserId:'old',content:'Fixture'}})
+  await p.announcementReaction.create({data:{id:'reaction',announcementId:'announcement',userId:'old',emoji:'ok'}})
+  await p.shoppingItem.create({data:{id:'shopping',wgId:'wg',name:'Fixture',addedBy:'old'}})
+  for (const id of ['old','new']) {
+    await p.gameSession.create({data:{id:`game-${id}`,wgId:'wg',gameType:'SKAT',createdBy:id}})
+    await p.gameResult.create({data:{id:`result-${id}`,gameSessionId:`game-${id}`,userId:id,points:id==='old'?100:250}})
+  }
+  await p.expense.create({data:{id:'expense',wgId:'wg',amount:30,description:'Fixture',paidBy:'old',splitWith:['old','third'],splitMode:'INDIVIDUAL',splits:{old:10,third:20}}})
+  await p.settlement.create({data:{id:'settlement',wgId:'wg',fromUserId:'third',toUserId:'old',amount:5}})
+  await p.notification.create({data:{id:'notice',wgId:'wg',userId:'old',type:'ANNOUNCEMENT',message:'Fixture'}})
+  await db.exec(`ALTER TABLE public."PushSubscription" ADD COLUMN IF NOT EXISTS "applicationOrigin" TEXT;`)
+  await p.pushSubscription.create({data:{id:'push',userId:'old',endpoint:'https://example.invalid/push',p256dh:'synthetic',auth:'synthetic'}})
+  await p.spotifyPlaylist.create({data:{id:'playlist',wgId:'wg',userId:'old',title:'Fixture',spotifyUrl:'https://example.invalid'}})
+  await p.wGEvent.create({data:{id:'event',wgId:'wg',createdBy:'old',title:'Fixture',startDate:new Date()}})
+  await p.inviteToken.create({data:{id:'invite',wgId:'wg',createdBy:'old',token:'synthetic-invite',expiresAt:new Date()}})
+  await p.passwordResetToken.create({data:{id:'reset',email:'old@example.invalid',token:'synthetic-reset',expiresAt:new Date()}})
+  const sql=readFileSync('scripts/merge-user.sql','utf8')
+  const begin=`BEGIN; SELECT set_config('wg.merge_source','old',true),set_config('wg.merge_target','new',true),set_config('wg.merge_wg','wg',true);`
+  // Ambiguous financial ownership must roll back the whole transaction.
+  await p.expense.update({where:{id:'expense'},data:{splitWith:['old','new','third']}})
+  await assert.rejects(db.exec(begin+sql+'COMMIT;'),/merge collision/)
+  await db.exec('ROLLBACK;')
+  assert.equal(await p.user.count(),3)
+  assert.equal(await p.gameResult.count({where:{userId:'old'}}),1)
+  await p.expense.update({where:{id:'expense'},data:{splitWith:['old','third']}})
+  await db.exec(begin+sql+'COMMIT;')
+  assert.equal(await p.user.count({where:{id:'old'}}),0)
+  assert.deepEqual(await p.user.findUnique({where:{id:'new'}}),target)
+  assert.equal(await p.gameResult.count({where:{userId:'new'}}),2)
+  assert.equal((await p.gameResult.aggregate({_sum:{points:true},where:{userId:'new'}}))._sum.points,350)
+  const expense=await p.expense.findUnique({where:{id:'expense'}})
+  assert.deepEqual(expense.splitWith,['new','third'])
+  assert.deepEqual(expense.splits,{new:10,third:20})
+  assert.equal(expense.paidBy,'new')
+  assert.deepEqual((await p.duty.findUnique({where:{id:'duty'}})).rotationOrder,['new','third'])
+  assert.equal((await p.dutyAssignment.findUnique({where:{id:'assignment'}})).completedBy,'new')
+  assert.equal(await p.passwordResetToken.count(),0)
+  assert.equal((await db.query(`SELECT count(*)::int n FROM wg_hosting.account_merge_rows WHERE table_name='User'`)).rows[0].n,2)
+  assert.equal((await db.query(`SELECT relrowsecurity FROM pg_class WHERE oid='wg_hosting.account_merge_rows'::regclass`)).rows[0].relrowsecurity,true)
+  console.log('Account merge: collision rollback, all reference checks, finance shares, game totals, protected backup and retained login passed.')
+} finally { await close() }
