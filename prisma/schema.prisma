@@ -13,6 +13,7 @@ model WGConfig {
   inviteCode String   @unique @default(cuid())
   createdAt  DateTime @default(now())
 
+  weeklyDutyPlan   WeeklyDutyPlan?
   members          User[]
   duties           Duty[]
   assignments      DutyAssignment[]
@@ -131,6 +132,7 @@ model DutyAssignment {
   completedAt       DateTime?
   completedBy       String?
   overdueNotifiedAt DateTime?
+  weekStart         DateTime? @db.Date
   createdAt         DateTime  @default(now())
 
   wg           WGConfig      @relation(fields: [wgId], references: [id], onDelete: Cascade)
@@ -143,6 +145,7 @@ model DutyAssignment {
   @@index([wgId, dueDate])
   @@index([userId])
   @@index([dutyId])
+  @@unique([dutyId, weekStart])
 }
 
 model SwapRequest {
@@ -294,6 +297,9 @@ model Notification {
   type      NotificationType
   message   String
   link      String?
+  deliveryKey String? @unique
+  pushTitle String?
+  pushSentAt DateTime?
   readAt    DateTime?
   createdAt DateTime         @default(now())
 
@@ -340,6 +346,7 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  applicationOrigin String?
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -452,4 +459,13 @@ model WGEvent {
 
   @@index([wgId, startDate])
   @@index([createdBy])
+}
+
+model WeeklyDutyPlan {
+  wgId String @id
+  startMonday DateTime @db.Date
+  memberOrder String[]
+  dutyOrder String[]
+  createdAt DateTime @default(now())
+  wg WGConfig @relation(fields: [wgId], references: [id], onDelete: Cascade)
 }

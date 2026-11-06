@@ -1,0 +1,9 @@
+.tools/
+tmp/
+tests/
+docs/
+.env*
+.git/
+node_modules/
+.next/
+unnamed.jpg

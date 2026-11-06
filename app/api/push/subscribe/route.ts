@@ -13,14 +13,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
   }
 
+  const applicationOrigin = process.env.NEXT_PUBLIC_APP_URL
+    ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
+    : new URL(req.url).origin
   await prisma.pushSubscription.upsert({
     where: { endpoint },
-    update: { userId: session.user.id, p256dh: keys.p256dh, auth: keys.auth },
+    update: { userId: session.user.id, p256dh: keys.p256dh, auth: keys.auth, applicationOrigin },
     create: {
       userId: session.user.id,
       endpoint,
       p256dh: keys.p256dh,
       auth: keys.auth,
+      applicationOrigin,
     },
   })
 

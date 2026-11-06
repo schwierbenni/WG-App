@@ -17,6 +17,7 @@ interface SimpleUser {
 interface DutyCardAssignment {
   id: string
   dueDate: string
+  weekStart?: Date | string | null
   completedAt: string | null
   duty: {
     id: string
@@ -203,7 +204,7 @@ export function DutyCard({ assignment, members = [], onUpdate }: DutyCardProps) 
               </span>
             )}
           </Button>
-          {members.length > 1 && (
+          {members.length > 1 && !assignment.weekStart && (
             <SwapDialog
               assignmentId={assignment.id}
               dutyName={assignment.duty.name}

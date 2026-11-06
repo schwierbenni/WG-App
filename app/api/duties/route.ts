@@ -3,6 +3,8 @@ import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 import { rotateDueDuties } from '@/lib/duty-rotation'
+import { runWeeklyDutyPlan } from '@/lib/weekly-duty-service'
+import { mondayKey } from '@/lib/weekly-duty'
 
 const createDutySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -26,15 +28,18 @@ export async function GET() {
     // This does not depend on the external Vercel Cron actually being wired
     // up, so rotation reliably happens without a manual admin action.
     try {
+      await runWeeklyDutyPlan(wgId)
       await rotateDueDuties({ wgId })
     } catch (error) {
       logger.error('Automatische Dienstrotation (on-read) fehlgeschlagen', { wgId, error: String(error) })
     }
 
+    const weeklyPlan = await prisma.weeklyDutyPlan.findUnique({where:{wgId}})
     const duties = await prisma.duty.findMany({
       where: { wgId, isActive: true },
       include: {
         assignments: {
+          ...(weeklyPlan ? {where:{weekStart:new Date(`${mondayKey(new Date())}T00:00:00Z`)}} : {}),
           orderBy: [
             { completedAt: { sort: 'desc', nulls: 'first' } },
             { dueDate: 'desc' },
@@ -61,6 +66,7 @@ export async function POST(request: Request) {
   const { session, wgId } = auth
 
   if (session.user.role !== 'ADMIN') return Response.json({ error: 'Forbidden' }, { status: 403 })
+  if(await prisma.weeklyDutyPlan.findUnique({where:{wgId}}))return Response.json({error:'Diese WG nutzt den festen Plan mit vier Diensten. Änderungen müssen im Wochenplan abgestimmt werden.'},{status:409})
 
   try {
     const body = await request.json()

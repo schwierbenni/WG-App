@@ -10,15 +10,15 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id
         token.role = (user as { role?: string }).role
         token.wgId = (user as { wgId?: string }).wgId
-      } else if (token.id && !token.wgId) {
+      } else if (token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { wgId: true, role: true },
         })
-        if (dbUser) {
-          token.wgId = dbUser.wgId
-          token.role = dbUser.role
-        }
+        // A removed account must not retain access through an existing JWT.
+        if (!dbUser) return null
+        token.wgId = dbUser.wgId
+        token.role = dbUser.role
       }
       return token
     },

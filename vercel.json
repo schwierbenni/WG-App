@@ -15,6 +15,14 @@
     {
       "path": "/api/announcements/cron",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/duties/reminder-early",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/duties/reminder-late",
+      "schedule": "0 8 * * *"
     }
   ]
 }

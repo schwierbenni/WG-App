@@ -1180,7 +1180,7 @@ export default function ExpensesPage() {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Finanzen</h1>
+          <h1 className="text-2xl font-bold text-foreground">Finanzen</h1>
           <p className="text-sm text-gray-500 mt-1">Ausgaben und Schuldenausgleich</p>
         </div>
         <div className="flex gap-2">
@@ -1220,7 +1220,7 @@ export default function ExpensesPage() {
                   <Wallet className="h-5 w-5 text-blue-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-gray-900">WG-Kasse</p>
+                  <p className="text-sm font-bold text-foreground">WG-Kasse</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {myBalance === 0
                       ? 'Alles ausgeglichen ✓'
@@ -1468,7 +1468,7 @@ export default function ExpensesPage() {
                               return (
                                 <div key={exp.id} className="flex items-center gap-3 px-4 py-2.5 group">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-gray-800 truncate">{exp.description}</p>
+                                    <p className="text-xs font-medium text-foreground truncate">{exp.description}</p>
                                     <p className="text-[11px] text-gray-400 mt-0.5">
                                       {exp.paidBy === myId ? 'Du hast bezahlt' : `${memberMap.get(exp.paidBy)?.name ?? exp.paidBy} hat bezahlt`}
                                       {' · '}{formatDate(exp.date)}
@@ -1654,7 +1654,7 @@ export default function ExpensesPage() {
                 const splitDetail = getExpenseSplitDetail(expense)
                 const cat = getCategoryBySlug(expense.category)
                 return (
-                  <li key={expense.id} className={cn('flex items-start gap-3 px-6 py-3 group hover:bg-gray-50', isSettled && 'opacity-60')}>
+                  <li key={expense.id} className={cn('flex items-start gap-3 px-6 py-3 group hover:bg-surface-muted', isSettled && 'opacity-60')}>
                     <Avatar className="h-8 w-8 shrink-0 mt-0.5">
                       {expense.paidByUser.avatarUrl && (
                         <AvatarImage src={expense.paidByUser.avatarUrl} alt={expense.paidByUser.name} />
@@ -1665,7 +1665,7 @@ export default function ExpensesPage() {
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-medium text-gray-900 truncate">{expense.description}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{expense.description}</p>
                         {expense.receiptImageUrl && (
                           <a
                             href={expense.receiptImageUrl}
@@ -1709,7 +1709,7 @@ export default function ExpensesPage() {
                           {expense.category}
                         </Badge>
                       )}
-                      <span className="font-semibold text-sm text-gray-900 ml-1">
+                      <span className="font-semibold text-sm text-foreground ml-1">
                         {formatCurrency(expense.amount)}
                       </span>
                       <div className="flex gap-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
@@ -1767,7 +1767,7 @@ export default function ExpensesPage() {
                       </Avatar>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-foreground">
                         {isMyPayment ? 'Du' : s.fromUser.name}
                         {' → '}
                         {isReceivedByMe ? 'Dir' : s.toUser.name}

@@ -70,6 +70,7 @@ export async function PATCH(
     })
 
     if (!swapRequest) return Response.json({ error: 'Swap request not found' }, { status: 404 })
+    if(swapRequest.assignment.weekStart)return Response.json({error:'Dieser Dienst gehört zum festen Wochenplan.'},{status:409})
     if (swapRequest.toUserId !== session.user.id) return Response.json({ error: 'Only the recipient can accept or reject' }, { status: 403 })
     if (swapRequest.status !== 'PENDING') return Response.json({ error: 'Swap request is no longer pending' }, { status: 409 })
 

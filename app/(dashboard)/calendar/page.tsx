@@ -221,7 +221,7 @@ export default function CalendarPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Kalender</h1>
+          <h1 className="text-2xl font-bold text-foreground">Kalender</h1>
           <p className="text-sm text-gray-500 mt-1">Dienste und Fälligkeiten im Überblick</p>
         </div>
         <div className="flex items-center gap-2">
@@ -277,7 +277,7 @@ export default function CalendarPage() {
         <Card className="lg:col-span-2 overflow-hidden">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 capitalize">
+              <h2 className="text-lg font-semibold text-foreground capitalize">
                 {format(currentMonth, 'MMMM yyyy', { locale: de })}
               </h2>
               <div className="flex items-center gap-1">
@@ -343,7 +343,7 @@ export default function CalendarPage() {
                       key={key}
                       onClick={() => setSelectedDay(isSameDay(day, selectedDay ?? new Date('invalid')) ? null : day)}
                       className={cn(
-                        'bg-white p-1 min-h-[44px] sm:min-h-[64px] flex flex-col items-start transition-colors hover:bg-indigo-50 active:bg-indigo-50 text-left',
+                        'bg-surface p-1 min-h-[44px] sm:min-h-[64px] flex flex-col items-start transition-colors hover:bg-brand-muted active:bg-brand-muted text-left',
                         !isCurrentMonth && 'bg-gray-50',
                         isSelected && 'bg-indigo-50 ring-2 ring-indigo-400 ring-inset z-10',
                       )}
@@ -351,7 +351,7 @@ export default function CalendarPage() {
                       <span
                         className={cn(
                           'text-xs sm:text-sm font-medium leading-none mb-1',
-                          isCurrentMonth ? 'text-gray-900' : 'text-gray-300',
+                          isCurrentMonth ? 'text-foreground' : 'text-[var(--text-muted)]',
                           today && 'flex items-center justify-center h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-indigo-600 text-white font-bold',
                         )}
                       >
@@ -416,7 +416,7 @@ export default function CalendarPage() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-900">
+              <h2 className="text-base font-semibold text-foreground">
                 {selectedDay
                   ? format(selectedDay, 'EEEE, d. MMMM', { locale: de })
                   : 'Tag auswählen'}
