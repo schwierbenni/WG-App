@@ -182,7 +182,7 @@ export default function AnnouncementsPage() {
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Schwarzes Brett</h1>
+          <h1 className="text-2xl font-bold text-foreground">Schwarzes Brett</h1>
           <p className="text-sm text-gray-500 mt-1">Aufgaben mit Stichtag und Verantwortlichkeit</p>
         </div>
         <div className="flex items-center gap-2">
@@ -204,7 +204,7 @@ export default function AnnouncementsPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5 text-indigo-500" />
-                <h2 className="text-base font-semibold text-gray-900">Neue Aufgabe</h2>
+                <h2 className="text-base font-semibold text-foreground">Neue Aufgabe</h2>
               </div>
               <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
@@ -328,7 +328,7 @@ export default function AnnouncementsPage() {
                     <div className={cn('mt-1.5 h-2.5 w-2.5 rounded-full flex-shrink-0', styles.dot)} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900 leading-snug">
+                        <h3 className="text-sm font-semibold text-foreground leading-snug">
                           {task.title ?? task.content ?? '(Kein Titel)'}
                         </h3>
                         <div className="flex items-center gap-1 flex-shrink-0">

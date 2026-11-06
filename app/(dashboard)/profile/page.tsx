@@ -249,7 +249,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Mein Profil</h1>
+        <h1 className="text-2xl font-bold text-foreground">Mein Profil</h1>
         <p className="text-sm text-gray-500 mt-1">Konto und Einstellungen verwalten</p>
       </div>
 
@@ -265,7 +265,7 @@ export default function ProfilePage() {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">{profile.name}</h2>
+              <h2 className="text-lg font-semibold text-foreground">{profile.name}</h2>
               <p className="text-sm text-gray-500 break-all">{profile.email}</p>
               <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
                 <Badge

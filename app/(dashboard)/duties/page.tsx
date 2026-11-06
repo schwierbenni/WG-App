@@ -254,7 +254,7 @@ export default function DutiesPage() {
     <div hidden={weeklyActive} className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dienste</h1>
+          <h1 className="text-2xl font-bold text-foreground">Dienste</h1>
           <p className="text-sm text-gray-500 mt-1">Übersicht aller WG-Dienste und Zuweisungen</p>
         </div>
         <Button variant="outline" size="sm" onClick={fetchData} disabled={loading}>

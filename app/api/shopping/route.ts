@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { requireWgSession } from '@/lib/api-auth'
 import { prisma } from '@/lib/db'
+import { categorizeShoppingItem } from '@/lib/shopping-categories'
 
 const createItemSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+  name: z.string().trim().min(1, 'Name is required'),
   category: z.string().optional(),
   note: z.string().optional(),
 })
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     }
 
     const item = await prisma.shoppingItem.create({
-      data: { wgId, name: parsed.data.name, category: parsed.data.category ?? 'LEBENSMITTEL', note: parsed.data.note, addedBy: session.user.id },
+      data: { wgId, name: parsed.data.name, category: parsed.data.category ?? categorizeShoppingItem(parsed.data.name), note: parsed.data.note, addedBy: session.user.id },
       include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
     })
 
